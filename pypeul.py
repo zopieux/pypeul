@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
+# -*- encoding: utf-8 -*-
 
 # This file is part of pypeul.
 #
@@ -10,13 +10,13 @@
 # published by the Free Software Foundation, either version 3 of
 # the License, or (at your option) any later version.
 #
-# irclib is distributed in the hope that it will be useful,
+# pypeul is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU Lesser General Public License for more details.
 #
 # You should have received a copy of the GNU Lesser General Public
-# License along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+# License along with pypeul. If not, see <http://www.gnu.org/licenses/>.
 
 __version__ = 'Pypeul python IRC module v0.1 by Mick@el & Zopieux'
 
@@ -39,6 +39,9 @@ def irc_equals(s1, s2):
     return irc_lower(s1) == irc_lower(s2)
 
 class _tags(object):
+    Reset = '\x0f'
+    Uncolor = '\x03'
+
     class TagError(Exception): pass
     colors = {
         'white' : '00',
@@ -62,8 +65,6 @@ class _tags(object):
         'bold' : '\x02',
         'underline' : '\x1f',
         'reverse' : '\x16',
-        'reset' : '\x0f',
-        'uncolor' : '\x03',
     }
 
     def strip(self, text):
@@ -72,14 +73,15 @@ class _tags(object):
             text = text.replace(val[0], '')
         return text
 
-    class stoppable_tag(object):
-        def __init__(self, seq):
-            self.seq = seq
+    class callable_tag(object):
+        def __init__(self, start, end=''):
+            self.start = start
+            self.end = end
 
         def __add__(self, other):
             if isinstance(other, basestring):
                 return unicode(self) + other
-            elif isinstance(other, _tags.stoppable_tag):
+            elif isinstance(other, _tags.callable_tag):
                 return unicode(self) + unicode(other)
             else:
                 raise TypeError
@@ -87,55 +89,60 @@ class _tags(object):
         def __radd__(self, other):
             if isinstance(other, basestring):
                 return other + unicode(self)
-            elif isinstance(other, _tags.stoppable_tag):
+            elif isinstance(other, _tags.callable_tag):
                 return unicode(other) + unicode(self)
             else:
                 raise TypeError
 
-        def __or__(self, other):
-            if not isinstance(other, _tags.stoppable_tag):
-                raise TypeError
-            return _tags.stoppable_tag(self.seq + other.seq)
-
         def __unicode__(self):
-            return self.seq
+            return self.start
 
         def __call__(self, *params):
-            return self.seq + ' '.join(params) + self.seq
+            return self.start + ' '.join(params) + self.end
 
     def __getattr__(self, name):
-        color = ''
+        fg = None
+        bg = None
         format = ''
-        realbuffer = ''
-        stoppable = True
-        stopcolor = False
+        buffer = ''
 
-        for c in name:
-            realbuffer += c
-            if not realbuffer.istitle(): break
-            buffer = realbuffer.lower()
-            if buffer in self.colors or buffer == 'none':
-                stoppable = False
-                if stopcolor: break
-                if buffer == 'none':
-                    if color: break
-                    color = '\x03'
-                elif not color:
-                    color = '\x03' + self.colors[buffer]
+        for char in name:
+            buffer += char.lower()
+            found = True
+            if buffer in self.colors:
+                if fg is None:
+                    fg = self.colors[buffer]
+                elif bg is None:
+                    bg = self.colors[buffer]
                 else:
-                    color += ',' + self.colors[buffer]
-                    stopcolor = True
-                realbuffer = ''
+                    raise AttributeError(name)
             elif buffer in self.tags:
-                if buffer in ('reset', 'uncolor'):
-                    stoppable = False
-
+                if self.tags[buffer] in format:
+                    raise AttributeError(name)
                 format += self.tags[buffer]
-                realbuffer = ''
-        if color == '\x03' or realbuffer:
+            elif buffer == 'none':
+                if fg is None and bg is None:
+                    fg = ''
+                else:
+                    raise AttributeError(name)
+            else:
+                found = False
+
+            if found:
+                buffer = ''
+
+        if buffer or (fg == '' and bg is None):
             raise AttributeError(name)
 
-        return self.stoppable_tag(format) if stoppable else color + format
+        color = ''
+        uncolor = ''
+        if fg is not None:
+            uncolor = '\x03'
+            color = '\x03' + fg
+            if bg:
+                color += ',' + bg
+
+        return self.stoppable_tag(format + color, format + uncolor)
 
 Tags = _tags()
 
