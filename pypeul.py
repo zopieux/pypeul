@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
 
+# pypeul.py
+# A Python IRC module designed to write bots in a fast and easy way.
+
 # This file is part of pypeul.
 #
 # Copyright (c) 2010 Mick@el and Zopieux

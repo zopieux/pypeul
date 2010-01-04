@@ -2,9 +2,9 @@
 #-*- encoding: utf-8 -*-
 #
 # lodgeit.py
-# Paste files or strings to lodgeit
+# Module to paste files to lodgeit
 #
-# This file is part of irclib.
+# This file is part of pypeul.
 #
 # Copyright (c) 2010 Pierre Bourdon <delroth@gmail.com>
 #
@@ -19,11 +19,11 @@
 # GNU Lesser General Public License for more details.
 #
 # You should have received a copy of the GNU Lesser General Public
-# License along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+# License along with pypeul. If not, see <http://www.gnu.org/licenses/>.
 
 import xmlrpclib
 import os
-from irclib import Tags
+from pypeul import Tags
 
 XMLRPC = 'http://paste.pocoo.org/xmlrpc/'
 SHOW = 'http://paste.pocoo.org/show/%s/'
@@ -42,7 +42,7 @@ class Lodgeit(object):
                 self.react(target, args, private=True)
 
     def help(self, cmd, args):
-        out = u'%s: %s %s' % (Tags.Green + 'usage' + Tags.Uncolor, Tags.Bold(cmd), args)
+        out = u'%s: %s %s' % (Tags.Green('usage'), Tags.Bold(cmd), args)
         self.bot.message(target, out)
 
     def react(self, target, args, private):
