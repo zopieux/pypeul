@@ -121,5 +121,6 @@ bot = TestBot()
 bot.connect('irc.epiknet.net')
 bot.ident('TestBot')
 bot.load_module('arok')
+bot.load_module('chain')
 
 bot.run()

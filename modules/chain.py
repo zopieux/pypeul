@@ -3,7 +3,6 @@
 
 # chain.py
 # Chain module.
-# Pretty buggy for now.
 
 # This file is part of pypeul.
 #
@@ -23,41 +22,54 @@
 # License along with pypeul. If not, see <http://www.gnu.org/licenses/>.
 
 import re
+import urllib
+import operator
 
 class Chain(object):
     class _BasicChain:
-        def __init__(self, parent):
-            self.last = None
-            self.parent = parent
+        msg = ''
+        users = []
+        repeats = 3
 
         def handle(self, umask, target, msg):
-            if len(self.parent.msgs) >= self.parent.repeats_needed:
-                if len(set(self.parent.msgs.values())) == 1:
-                    if msg.lower() != self.last:
-                        self.last = msg.lower()
-                        return msg
-                else:
-                    self.last = None
+            if self.msg != msg: # chain broken...
+                self.msg = msg
+                self.users = [umask.user]
+                return
+
+            if umask.user in self.users: # cheating user, just ignore him
+                return
+
+            self.users.append(umask.user)
+
+            if len(self.users) == self.repeats:
+                return msg
 
     class _NumericChain:
-        def __init__(self, parent):
-            self.parent = parent
+        numbers = []
+        last_r = None
+        repeats = 5
+        special_seqs = {}
+        url = 'http://www.research.att.com/~njas/sequences/?q=%s&n=1&fmt=3'
 
         def format_float(self, f):
-            if f - int(f) < 0.0000000001:
+            if round(f, 10) == int(f):
                 return unicode(int(f))
             else:
                 return unicode(f)
 
         def get_reason(self, type, numbers):
+            if 0 in numbers and type == '*':
+                return
+
             prev_r = None
             for i, num in enumerate(numbers):
                 if i == 0:
                     continue
                 if type == '+':
-                    r = num - numbers[i - 1]
+                    r = round(num - numbers[i - 1], 8)
                 elif type == '*':
-                    r = num / numbers[i - 1]
+                    r = round(num / numbers[i - 1], 8)
                 else:
                     raise AttributeError('type')
 
@@ -67,36 +79,91 @@ class Chain(object):
 
             return prev_r
 
+        def get_special_seq(self, numbers):
+            numbers = numbers[:]
+            for i, number in enumerate(numbers):
+                if round(number, 10) != int(number):
+                    return
+                numbers[i] = unicode(int(number))
+
+            find_re = re.compile('(?:^|,)' + ','.join(numbers) + ',(\d+)(?:,|$)')
+            match = None
+
+            for id, seq in self.special_seqs.items():
+                match = find_re.search(seq)
+                if match:
+                    return id, match.group(1)
+
+            data = [line.split()[1:] for line in urllib.urlopen(
+                self.url % (','.join(numbers))
+                ).read().split('\n')
+                if line[:2] in ('%S', '%T', '%U')]
+            if not data:
+                return
+
+            id = data[0][0]
+            seq = ''.join(map(operator.itemgetter(1), data))
+
+            match = find_re.search(seq)
+
+            if not match:
+                return
+
+            self.special_seqs[id] = seq
+            return id, match.group(1)
+
         def handle(self, umask, target, msg):
-            numbers = []
-            for i, number in enumerate(self.parent.msgs_[-3:]):
-                number = number.replace(u'pi', u'3.14159265758979')
+            try:
+                self.numbers.append(float(msg))
+            except ValueError: # no number, no sequence
+                self.numbers = []
+                self.last_r = None
+                return
+
+            if len(self.numbers) > self.repeats:
+                self.numbers.pop(0)
+
+            if len(self.numbers) < self.repeats:
+                return
+
+            add_r = self.get_reason('+', self.numbers)
+            mul_r = self.get_reason('*', self.numbers)
+
+            if add_r:
+                if self.last_r == ('+', add_r):
+                    return
+                self.last_r = ('+', add_r)
+                self.numbers = []
+                return self.format_float(self.numbers[-1] + add_r)
+            elif mul_r:
+                if self.last_r == ('*', mul_r):
+                    return
+                self.last_r = ('*', mul_r)
+                self.numbers = []
+                return self.format_float(self.numbers[-1] * mul_r)
+
+            else:
                 try:
-                    numbers.append(float(number))
-                except ValueError:
+                    id, next = self.get_special_seq(self.numbers)
+                except:
+                    self.last_r = None
                     return
 
-                if i == self.parent.repeats_needed:
-                    break
+                if self.last_r == ('?', id):
+                    return
 
-            add_r = self.get_reason('+', numbers)
-            if add_r:
-                return self.format_float(numbers[-1] + add_r)
-
-            mul_r = self.get_reason('*', numbers)
-            if mul_r:
-                return self.format(numbers[-1] * mul_r)
+                self.last_r = ('?', id)
+                self.numbers = []
+                return next
 
     class _CompleteChain:
-        def __init__(self, parent):
-            self.parent = parent
-            self.complete = {
-                u'koi': u'feur',
-                u'alo': u'alo',
-                u'kikoo': u'lol',
-                u'lol alo': u'alo ui ?',
-                u'sava': u'œ',
-             }
+        complete = {
+            u'koi': u'feur',
+            u'alo': u'alo',
+            u'kikoo': u'lol',
+            u'lol alo': u'alo ui ?',
+            u'sava': u'œ',
+         }
 
         def handle(self, umask, target, msg):
             msg = msg.lower().strip()
@@ -105,9 +172,7 @@ class Chain(object):
 
 
     class _AccumulationChain:
-        def __init__(self, parent):
-            self.parent = parent
-            self.reg_d = re.compile(ur'^:(\s*)(d|p)$', re.I)
+        reg_d = re.compile(ur'^:(\s*)(d|p)$', re.I)
 
         def find_shortest_pattern(self, msg):
             # TODO have fun
@@ -125,25 +190,16 @@ class Chain(object):
 
     def __init__(self, bot):
         self.bot = bot
-        self.msgs = {}
-        self.msgs_ = []
-        self.repeats_needed = 3
         self.handlers = []
 
-        for chain in ('Basic', 'Numeric', 'Accumulation', 'Complete'):
-            inst = getattr(self, '_' + chain + 'Chain')(self)
+        for chain in ('Basic', 'Accumulation', 'Complete', 'Numeric'):
+            inst = getattr(self, '_' + chain + 'Chain')()
             setattr(self, chain + 'Chain', inst)
             self.handlers.append(inst)
 
     def on_server_privmsg(self, umask, target, msg):
-        self.msgs[umask.user] = msg
-        self.msgs_.append(msg)
-        
-        if len(self.msgs) > self.repeats_needed:
-            self.msgs = {}
-            self.msgs_ = []
-
         for handler in self.handlers:
             output = handler.handle(umask, target, msg)
             if output:
                 self.bot.message(target, output)
+                return

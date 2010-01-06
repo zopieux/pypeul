@@ -45,7 +45,6 @@ class _tags(object):
     Reset = '\x0f'
     Uncolor = '\x03'
 
-    class TagError(Exception): pass
     colors = {
         'white' : '00',
         'black' : '01',
@@ -145,7 +144,7 @@ class _tags(object):
             if bg:
                 color += ',' + bg
 
-        return self.stoppable_tag(format + color, format + uncolor)
+        return self.callable_tag(format + color, format + uncolor)
 
 Tags = _tags()
 
