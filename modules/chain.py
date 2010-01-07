@@ -132,15 +132,20 @@ class Chain(object):
             if add_r:
                 if self.last_r == ('+', add_r):
                     return
+
+                ret = self.format_float(self.numbers[-1] + add_r)
                 self.last_r = ('+', add_r)
                 self.numbers = []
-                return self.format_float(self.numbers[-1] + add_r)
+                return ret
+
             elif mul_r:
                 if self.last_r == ('*', mul_r):
                     return
+
+                ret =  self.format_float(self.numbers[-1] * mul_r)
                 self.last_r = ('*', mul_r)
                 self.numbers = []
-                return self.format_float(self.numbers[-1] * mul_r)
+                return ret
 
             else:
                 try:
