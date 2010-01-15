@@ -2,7 +2,7 @@
 # -*- encoding: utf-8 -*-
 
 # pypeul.py
-# A Python IRC module designed to write bots in a fast and easy way.
+# An IRC client library designed to write bots in a fast and easy way.
 
 # This file is part of pypeul.
 #
@@ -21,7 +21,7 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with pypeul. If not, see <http://www.gnu.org/licenses/>.
 
-__version__ = 'Pypeul python IRC module v0.1 by Mick@el & Zopieux'
+__version__ = 'Pypeul python IRC client library v0.1 by Mick@el & Zopieux'
 
 ENCODING = 'utf-8'
 
@@ -453,7 +453,7 @@ class IRC(object):
             except UnicodeDecodeError:
                 return string.decode('iso-8859-15', 'replace')
 
-    def _parse_modes(self, modestr, targets):
+    def parse_modes(self, modestr, targets):
         last = None
         i = 0
         out = []
@@ -483,7 +483,9 @@ class IRC(object):
             self.log('calling %s() on instance %r' % (name, inst))
 
             if self.thread_callbacks:
-                threading.Thread(target = f, args = parameters).start()
+                t = threading.Thread(target = f, args = parameters)
+                t.daemon = True
+                t.start()
             else:
                 f(*parameters)
 
@@ -628,7 +630,7 @@ class IRC(object):
             modestr = params[1]
             targets = params[2:]
 
-            for add, mode, value in self._parse_modes(modestr, targets):
+            for add, mode, value in self.parse_modes(modestr, targets):
                 if mode in self.serverconf.user_level_modes:
                     user = UserMask(self, value).user
                     mode_set =  user.channel_modes[irc_lower(chan)]
