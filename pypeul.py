@@ -34,6 +34,14 @@ from textwrap import wrap
 
 RE_COLOR = re.compile(r'\x03(\d{1,2})?(?:,(\d{1,2})?)?')
 
+# Decorator used to specify that a callbacks needs to be run in a thread
+def threaded(func):
+    if not func.func_name.lower().startswith('on_'):
+        raise TypeError("threaded decorator can only be used on callback functions")
+
+    func.threaded = True
+    return func
+
 def irc_lower(s):
 	# TODO: better implementation
     return s.encode('utf-8').lower().decode('utf-8')
@@ -199,7 +207,7 @@ class ServerConfig(object):
             self.chanmodes.numeric | self.prefixes_modes
 
 class IRC(object):
-    def __init__(self, loggingEnabled = True, thread_callbacks = True):
+    def __init__(self, loggingEnabled = True, thread_callbacks = False):
         self.thread_callbacks = thread_callbacks
         self.loggingEnabled = loggingEnabled
 
@@ -482,7 +490,7 @@ class IRC(object):
 
             self.log('calling %s() on instance %r' % (name, inst))
 
-            if self.thread_callbacks:
+            if self.thread_callbacks or getattr(f, 'threaded', None):
                 t = threading.Thread(target = f, args = parameters)
                 t.daemon = True
                 t.start()
