@@ -118,7 +118,7 @@ class TestBot(IRC):
             raise ModuleNotFound
 
 bot = TestBot()
-bot.connect('irc.epiknet.net')
+bot.connect('irc.epiknet.net', 7002, True)
 bot.ident('TestBot')
 bot.load_module('arok')
 bot.load_module('chain')

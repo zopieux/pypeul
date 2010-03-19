@@ -226,11 +226,16 @@ class IRC(object):
     def is_me(self, user):
         return irc_equals(unicode(user), unicode(self.myself))
 
-    def connect(self, host, port = 6667):
+    def connect(self, host, port = 6667, use_ssl=False):
         '''Etablish a connection to a server'''
         self.log('@ Connecting to %s port %d' % (host, port))
 
         self.sk = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        
+        if use_ssl:
+            import ssl
+            self.sk = ssl.wrap_socket(self.sk)
+        
         self.sk.connect((host, port))
 
         self.log('@ Connected')
@@ -491,10 +496,12 @@ class IRC(object):
             self.log('calling %s() on instance %r' % (name, inst))
 
             if self.thread_callbacks or getattr(f, 'threaded', None):
+                self.log('(threaded)')
                 t = threading.Thread(target = f, args = parameters)
                 t.daemon = True
                 t.start()
             else:
+                self.log('(not threaded)')
                 f(*parameters)
 
     def _process_message(self, text):
@@ -563,11 +570,12 @@ class IRC(object):
                 try:
                     name, value = param.split('=')
                     self.serverconf[name] = value
+
                 except ValueError:
                     self.serverconf[param] = True
-
-            if 'NAMESX' in self.serverconf:
-                self.send('PROTOCTL', 'NAMESX')
+                    
+                    if param == 'NAMESX':
+                        self.send('PROTOCTL', 'NAMESX')
 
         elif cmd == '367': # Ban list item
             chan = irc_lower(params[1])
