@@ -610,8 +610,11 @@ class IRC(object):
                 if pos > -1:
                     name, value = name[:pos], name[pos + 1:]
 
-                self._callback('on_ctcp_request', umask, name, value)
-                self._callback('on_ctcp_' + name.lower() + '_request', umask, value)
+                if name == 'ACTION': # /me
+                    self._callback('on_action', umask, params[0], value)
+                else:
+                    self._callback('on_ctcp_request', umask, name, value)
+                    self._callback('on_ctcp_' + name.lower() + '_request', umask, value)
             else:
                 self._callback('on_message', umask, *params)
 
