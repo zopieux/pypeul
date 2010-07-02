@@ -22,11 +22,14 @@
 # License along with pypeul. If not, see <http://www.gnu.org/licenses/>.
 
 from pypeul import *
+from imp import reload
 import sys
 
 class ModuleNotFound(Exception): pass
 
 class TestBot(IRC):
+    admins = ('mickael.is-a-geek.net', 'home.zopieux.com')
+
     def on_ready(self):
         self.join('#pypeul')
 
@@ -69,7 +72,7 @@ class TestBot(IRC):
                     except ModuleNotFound:
                         self.message(target, 'Module %s not found.' % Tags.Bold(modname))
 
-            if umask.host not in ('mickael.is-a-geek.net', 'home.zopieux.com'):
+            if umask.host not in self.admins:
                 return
 
             if msg.startswith('!dump '):
@@ -116,10 +119,12 @@ class TestBot(IRC):
         except KeyError:
             raise ModuleNotFound
 
-bot = TestBot()
-bot.connect('irc.epiknet.net', 7002, True)
-bot.ident('TestBot')
-bot.load_module('arok')
-bot.load_module('chain')
+if __name__ == '__main__':
+    bot = TestBot()
+    bot.connect('irc.epiknet.net', 7002, True)
+    bot.ident('TestBot')
+    bot.load_module('arok')
+    bot.load_module('chain')
+    bot.load_module('snippet')
 
-bot.run()
+    bot.run()

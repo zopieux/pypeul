@@ -37,7 +37,7 @@ class SimpleBot(IRC):
         There are various on_self_* event handlers. They're called when the bot
         does something related to itself (the usermask is the bot's one).
         In this case, this callback is triggered when the bot joins a channel.
-        Let's welcome people, with some colors! LAUNCH IT MICK
+        Let's welcome people, with some colors!
         """
         self.message(target, Tags.Red("Hello, ") + Tags.Blue("World!"))
 
