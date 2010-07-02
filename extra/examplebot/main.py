@@ -1,10 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #-*- encoding: utf-8 -*-
 
 # main.py
-# Test bot for pypeul.
+# Example of a modulable bot for pypeul.
 
-# This file is part of pypeul.
+# This file is part of pypeul IRC lib.
 #
 # Copyright (c) 2010 Mick@el and Zopieux
 #
@@ -28,29 +28,29 @@ class ModuleNotFound(Exception): pass
 
 class TestBot(IRC):
     def on_ready(self):
-        self.join('#irclib-dev')
+        self.join('#pypeul')
 
     def on_server_privmsg(self, umask, target, msg):
 
         try:
             if msg.startswith('!colorize '):
                 words = msg[10:].split()
-                self.message(target, u' '.join(
+                self.message(target, ' '.join(
                     (Tags.__getattr__(_.title()) if _.lower() in Tags.colors \
                     else  _ + Tags.Uncolor) for _ in words))
 
             elif msg.startswith('!guess '):
-                guessed = map(lambda t: Tags.Bold(unicode(t)), self.nick_guess(msg[7:], target))
+                guessed = list(map(lambda t: Tags.Bold(str(t)), self.nick_guess(msg[7:], target)))
                 if len(guessed) == 0:
-                    self.message(target, u'Connaît pas.')
+                    self.message(target, 'Connaît pas.')
                 elif len(guessed) == 1:
-                    self.message(target, u'Lol tu veux dire ' + guessed[0] + u' !')
+                    self.message(target, 'Lol tu veux dire ' + guessed[0] + ' !')
                 else:
-                    self.message(target, u'Euh, tu veux dire ' +
-                        u', '.join(guessed[:-1]) + u' ou ' + guessed[-1] +  u' ?')
+                    self.message(target, 'Euh, tu veux dire ' +
+                        ', '.join(guessed[:-1]) + ' ou ' + guessed[-1] +  ' ?')
 
             elif msg.startswith('!load '):
-                for modname in map(unicode.lower, msg[6:].split()):
+                for modname in map(str.lower, msg[6:].split()):
                     if not modname:
                         continue
                     try:
@@ -60,7 +60,7 @@ class TestBot(IRC):
                         self.message(target, 'Module %s not found.' % Tags.Bold(modname))
 
             elif msg.startswith('!unload '):
-                for modname in map(unicode.lower, msg[8:].split()):
+                for modname in map(str.lower, msg[8:].split()):
                     if not modname:
                         continue
                     try:
@@ -73,15 +73,14 @@ class TestBot(IRC):
                 return
 
             if msg.startswith('!dump '):
-                self.message(target, unicode(eval(msg[6:])))
+                self.message(target, str(eval(msg[6:])))
 
             elif msg.startswith('!exec '):
-                exec msg[6:] in locals(), globals()
-
+                exec(msg[6:], locals(), globals())
 
         except Exception as ex:
             self.message(target, Tags.Bold('Exception : ') + repr(ex))
-            raise
+            #raise
 
     def on_ctcp_ping_request(self, umask, value):
         self.ctcp_reply(umask.nick, 'PING', value)

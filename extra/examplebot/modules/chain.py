@@ -22,7 +22,7 @@
 # License along with pypeul. If not, see <http://www.gnu.org/licenses/>.
 
 import re
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import operator
 
 class Chain(object):
@@ -54,9 +54,9 @@ class Chain(object):
 
         def format_float(self, f):
             if round(f, 10) == int(f):
-                return unicode(int(f))
+                return str(int(f))
             else:
-                return unicode(f)
+                return str(f)
 
         def get_reason(self, type, numbers):
             if 0 in numbers and type == '*':
@@ -84,7 +84,7 @@ class Chain(object):
             for i, number in enumerate(numbers):
                 if round(number, 10) != int(number):
                     return
-                numbers[i] = unicode(int(number))
+                numbers[i] = str(int(number))
 
             find_re = re.compile('(?:^|,)' + ','.join(numbers) + ',(\d+)(?:,|$)')
             match = None
@@ -94,10 +94,10 @@ class Chain(object):
                 if match:
                     return id, match.group(1)
 
-            data = [line.split()[1:] for line in urllib.urlopen(
+            data = [line.split()[1:] for line in urllib.request.urlopen(
                 self.url % (','.join(numbers))
                 ).read().split('\n')
-                if line[:2] in ('%S', '%T', '%U')]
+                if line[:2] in ('%S', '%T', '%')]
             if not data:
                 return
 
@@ -163,11 +163,11 @@ class Chain(object):
 
     class _CompleteChain:
         complete = {
-            u'koi': u'feur',
-            u'alo': u'alo',
-            u'kikoo': u'lol',
-            u'lol alo': u'alo ui ?',
-            u'sava': u'œ',
+            'koi': 'feur',
+            'alo': 'alo',
+            'kikoo': 'lol',
+            'lol alo': 'alo ui ?',
+            'sava': 'œ',
          }
 
         def handle(self, umask, target, msg):
@@ -177,7 +177,7 @@ class Chain(object):
 
 
     class _AccumulationChain:
-        reg_d = re.compile(ur'^:(\s*)(d|p)$', re.I)
+        reg_d = re.compile(r'^:(\s*)(d|p)$', re.I)
 
         def find_shortest_pattern(self, msg):
             # TODO have fun
@@ -191,7 +191,7 @@ class Chain(object):
             rd = self.reg_d.match(msg.strip())
             if rd:
                 rdg = rd.groups()
-                return u':%s%s' % ('-'*len(rdg[0]), rdg[1])
+                return ':%s%s' % ('-'*len(rdg[0]), rdg[1])
 
     def __init__(self, bot):
         self.bot = bot

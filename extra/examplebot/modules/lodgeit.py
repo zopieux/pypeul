@@ -21,7 +21,7 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with pypeul. If not, see <http://www.gnu.org/licenses/>.
 
-import xmlrpclib
+import xmlrpc
 import os
 from pypeul import Tags
 
@@ -31,7 +31,7 @@ SHOW = 'http://paste.pocoo.org/show/%s/'
 class Lodgeit(object):
     def __init__(self, bot):
         self.bot = bot
-        self.lodgeit = xmlrpclib.ServerProxy(XMLRPC, allow_none=True)
+        self.lodgeit = xmlrpc.client.ServerProxy(XMLRPC, allow_none=True)
 
     def on_server_privmsg(self, umask, target, msg):
         if msg.startswith('!paste'):
@@ -42,7 +42,7 @@ class Lodgeit(object):
                 self.react(target, args, private=True)
 
     def help(self, cmd, args):
-        out = u'%s: %s %s' % (Tags.Green('usage'), Tags.Bold(cmd), args)
+        out = '%s: %s %s' % (Tags.Green('usage'), Tags.Bold(cmd), args)
         self.bot.message(target, out)
 
     def react(self, target, args, private):
@@ -52,7 +52,7 @@ class Lodgeit(object):
         else:
             for fn in args:
                 id = self.paste(fn, private)
-                out = u'%s : %s' % (fn, SHOW % id)
+                out = '%s : %s' % (fn, SHOW % id)
                 self.bot.message(target, out)
 
     def paste(self, fn, private):
