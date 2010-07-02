@@ -21,7 +21,7 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with pypeul. If not, see <http://www.gnu.org/licenses/>.
 
-import xmlrpc
+import xmlrpc.client
 import os
 from pypeul import Tags
 
@@ -51,7 +51,12 @@ class Lodgeit(object):
             self.help(cmd, '<filename> [filename2] ... [filenameN]')
         else:
             for fn in args:
-                id = self.paste(fn, private)
+                try:
+                    id = self.paste(fn, private)
+                except IOError:
+                    self.bot.message(target, 'IOError.')
+                    return
+
                 out = '%s : %s' % (fn, SHOW % id)
                 self.bot.message(target, out)
 

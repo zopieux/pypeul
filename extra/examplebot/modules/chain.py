@@ -96,8 +96,9 @@ class Chain(object):
 
             data = [line.split()[1:] for line in urllib.request.urlopen(
                 self.url % (','.join(numbers))
-                ).read().split('\n')
+                ).read().decode('utf-8').split('\n')
                 if line[:2] in ('%S', '%T', '%')]
+
             if not data:
                 return
 
@@ -150,7 +151,7 @@ class Chain(object):
             else:
                 try:
                     id, next = self.get_special_seq(self.numbers)
-                except:
+                except TypeError:
                     self.last_r = None
                     return
 

@@ -35,9 +35,9 @@ class TestBot(IRC):
         try:
             if msg.startswith('!colorize '):
                 words = msg[10:].split()
-                self.message(target, ' '.join(
+                self.message(target, ' '.join(str(
                     (Tags.__getattr__(_.title()) if _.lower() in Tags.colors \
-                    else  _ + Tags.Uncolor) for _ in words))
+                    else  _ + Tags.Uncolor)) for _ in words))
 
             elif msg.startswith('!guess '):
                 guessed = list(map(lambda t: Tags.Bold(str(t)), self.nick_guess(msg[7:], target)))
