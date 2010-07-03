@@ -283,76 +283,78 @@ class IRC(object):
 
         self.log('> ' + raw)
 
-    def send(self, command, *params, **kwargs):
+    def send(self, *params, last=''):
         """
         Send a message to the server.
-        If an argument contains a newline or a space or if it begins with a ':',
-        it will be considered as the "last" argument.
-        You can also use the "last=..." keyword argument.
-        The "last" argument is prefixed with a ':' character in the raw message.
-        If a newline is found in the "last" argument, the command is repeated
-        with only the "last" argument being split.
-        If a line is too long (460 chars), the "last" argument will be broken as well.
-        The last argument will also be parsed for format codes, so that the formatting
-        can continue on the next line.
-        The no_break keyword argument disables breaking of too long lines.
-        The no_format keyword argument disables format parsing.
+        Arguments can not contain space, newlines or begin with a ':'
+
+        Only the "last" keywork argument can contain spaces and is prefixed
+        with a ':' character in the raw message.
         """
 
-        prefix = command
-        last = False
-        last_prm = ''
-        no_break = False
-        no_format = False
-
-        for arg, val in kwargs.items():
-            if arg == 'last':
-                last_prm = val
-            elif arg == 'no_break':
-                no_break = val
-            elif arg == 'no_format':
-                no_format = val
-            else:
-                raise ValueError(arg)
-
+        prefix = ''
 
         for prm in params:
             prm = str(prm)
-            if not prm: continue
-            if (' ' in prm or '\n' in prm or prm[0] == ':') and not last:
-                if last_prm:
-                    raise ValueError('space or newline in non-last argument')
-                last = True
-                last_prm = prm
+
+            if not prm:
                 continue
 
-            if last:
-                last_prm += ' ' + prm
-            else:
-                prefix += ' ' + prm
+            if '\n' in prm or '\r' in prm:
+                raise ValueError("newlines not allowed in parameters")
 
-        if last_prm:
+            if ' ' in prm or prm[0] == ':':
+                raise ValueError("space or ':' prefix in non-last argument")
+
+            prefix += prm + ' '
+
+        prefix = prefix[:-1] # remove trailing space
+
+        if '\n' in last or '\r' in last:
+            raise ValueError("newlines not allowed in last argument")
+
+        if last:
+            self.raw(prefix + ' :' + last)
+        else:
+            self.raw(prefix)
+
+    def send_multi(self, *params, last='', no_break=False, no_format=False):
+        """
+        Send a command multiple times to the server.
+        For each newline in the last argument, the command will be repeated.
+
+        If the last argument is too long, it will be split into multiple lines
+        unless the no_break argument is set.
+
+        The effective formatting at the end of each line will be repeated on the
+        beginning of the next line unless the no_format argument is set.
+        """
+
+        if last:
             fgcolor = ''
             bgcolor = ''
             format = []
 
-            for unwrapped_line in last_prm.split('\n'):
+            for unwrapped_line in last.split('\n'):
                 if not unwrapped_line.strip():
                     continue
 
                 if no_break:
                     wraps = [unwrapped_line]
                 else:
-                    wraps = wrap(unwrapped_line, 460 - len(prefix))
+                    wraps = wrap(unwrapped_line, 460 - len(' '.join(params)))
 
                 for wrapped_line in wraps:
                     line = ''.join(format)
+
                     if fgcolor or bgcolor:
                         line += '\x03' + fgcolor
+
                         if bgcolor:
                             line += ',' + bgcolor
                     line += wrapped_line
-                    self.raw(prefix + ' :' + line.replace('\r',''))
+
+                    self.send(*params, last=line.replace('\r',''))
 
                     if no_format:
                         continue
@@ -361,26 +363,30 @@ class IRC(object):
                     while i < len(line):
                         char = line[i]
                         i += 1
-                        if char == '\x0f': # reset
+
+                        if char == Tags.Reset:
                             fgcolor = bgcolor = ''
                             format = []
-                        elif char in ('\x02', '\x1f', '\x16'):
+                        elif char in Tags.tags.values():
                             if char in format:
                                 format.remove(char)
                             else:
                                 format.append(char)
                         elif char == '\x03':
                             match = RE_COLOR.match(line[i-1:])
+
                             if not match: # uncolor
                                 fgcolor = bgcolor = ''
                             else:
                                 if match.group(1):
                                     fgcolor = match.group(1)
+
                                 if match.group(2):
                                     bgcolor = match.group(2)
+
                                 i += match.end() - 1
         else:
-            self.raw(prefix)
+            self.send(*params)
 
     def ident(self, nick, ident = None,
             realname=__version__, password = None):
@@ -393,47 +399,42 @@ class IRC(object):
         self.myself = UserMask(self, nick).user
         self.myself.ident = ident
 
-        self.send('NICK', nick)
-        self.send('USER', ident, nick, nick, realname)
+        self.nick(nick)
+        self.send('USER', ident, nick, nick, last=realname)
 
         if password:
             self.send('PASS', password)
 
+    def nick(self, nick):
+        self.send('NICK', nick)
+
     def join(self, channel, password=''):
         '''Join a channel'''
-
-        if password:
-            self.send('JOIN', channel, password)
-
-        else:
-            self.send('JOIN', channel)
+        self.send('JOIN', channel, password)
 
     def part(self, channel, reason=''):
-        if reason:
-            self.send('PART', channel, reason)
-        else:
-            self.send('PART', channel)
+        self.send('PART', channel, last=reason)
 
     def message(self, target, text):
         '''Send a message to a nick / channel'''
-        self.send('PRIVMSG', target, last=text)
+        self.send_multi('PRIVMSG', target, last=text)
 
     def notice(self, target, text):
         '''Send a notice to a nick / channel'''
-        self.send('NOTICE', target, last=text)
+        self.send_multi('NOTICE', target, last=text)
 
     def topic(self, chan, newtopic):
         '''Change the topic of chan to newtopic'''
 
-        self.send('TOPIC', chan, newtopic, no_break=True)
+        self.send('TOPIC', chan, last=newtopic)
 
     def kick(self, chan, user, reason=''):
         '''Kick user on chan'''
 
-        self.send('KICK', chan, user, reason, no_break=True)
+        self.send('KICK', chan, user, last=reason)
 
     def quit(self, reason=''):
-        self.send('QUIT', reason, no_break=True)
+        self.send('QUIT', last=reason)
 
     def retrieve_ban_list(self, chan):
         self.bans[irc_lower(chan)] = []
@@ -496,12 +497,10 @@ class IRC(object):
             self.log('calling %s() on instance %r' % (name, inst))
 
             if self.thread_callbacks or getattr(f, 'threaded', None):
-                self.log('(threaded)')
                 t = threading.Thread(target = f, args = parameters)
                 t.daemon = True
                 t.start()
             else:
-                self.log('(not threaded)')
                 f(*parameters)
 
     def _process_message(self, text):
@@ -547,7 +546,7 @@ class IRC(object):
         self._callback('on_server_' + cmd.lower(), umask, *params)
 
         if cmd == 'PING':
-            self.send('PONG', params[0])
+            self.send('PONG', last=params[0])
 
         elif cmd == 'NICK' and umask:
             olduser = irc_lower(umask.user.nick)
