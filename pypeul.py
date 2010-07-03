@@ -162,6 +162,7 @@ class ServerConfig(object):
         'CHANMODES': 'ovb,k,l,psitnm',
         'PREFIX': '(ov)@+',
         'MAXLIST': 'b:10,e:10,I:10', # arbitrary
+        'MODES' : '3',
         }
 
     def __getitem__(self, item):
@@ -181,6 +182,10 @@ class ServerConfig(object):
     def maxlists(self):
         return dict((_.split(':')[0], int(_.split(':')[1]))
             for _ in self.info['MAXLIST'].split(','))
+
+    @property
+    def mode_targets(self):
+        return int(self.info['MODES'])
 
     @property
     def lists(self):
@@ -435,6 +440,56 @@ class IRC(object):
 
     def quit(self, reason=''):
         self.send('QUIT', last=reason)
+
+    def set_modes(self, target, *modes):
+        """usage: set_modes('#foo', ('-o', 'Foo2'), ('+l', '30'), '-k')"""
+
+        def _key(i):
+            if isinstance(i, str):
+                name = i
+                val = ''
+            else:
+                name, val = i
+
+            return (not bool(val), name, val)
+
+        m = tuple(sorted(modes, key=_key))
+        print(repr(m))
+
+        if not m:
+            return
+
+        j = 0
+
+        while j < len(m):
+            cur_sign = None
+            modenames = ''
+            modevals = []
+
+            i = 0
+
+            while len(target + modenames + ' '.join(modevals)) < 450 \
+                and i < self.serverconf.mode_targets and j < len(m):
+
+                if isinstance(m[j], str):
+                    name = m[j]
+                    val = None
+                else:
+                    name, val = m[j]
+
+                if cur_sign != name[0]:
+                    cur_sign = name[0]
+                    modenames += name[0]
+
+                modenames += name[1:]
+
+                if val:
+                    modevals += [val]
+
+                i += 1
+                j += 1
+
+            self.send('MODE', target, modenames, *modevals)
 
     def retrieve_ban_list(self, chan):
         self.bans[irc_lower(chan)] = []
