@@ -203,7 +203,7 @@ class Chain(object):
             setattr(self, chain + 'Chain', inst)
             self.handlers.append(inst)
 
-    def on_server_privmsg(self, umask, target, msg):
+    def on_message(self, umask, target, msg):
         for handler in self.handlers:
             output = handler.handle(umask, target, msg)
             if output:

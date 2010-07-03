@@ -33,7 +33,7 @@ class TestBot(IRC):
     def on_ready(self):
         self.join('#pypeul')
 
-    def on_server_privmsg(self, umask, target, msg):
+    def on_message(self, umask, target, msg):
 
         try:
             if msg.startswith('!colorize '):

@@ -33,7 +33,7 @@ class Lodgeit(object):
         self.bot = bot
         self.lodgeit = xmlrpc.client.ServerProxy(XMLRPC, allow_none=True)
 
-    def on_server_privmsg(self, umask, target, msg):
+    def on_message(self, umask, target, msg):
         if msg.startswith('!paste'):
             cmd, args = msg.split()[0], msg.split()[1:]
             if cmd == '!paste':
