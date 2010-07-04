@@ -777,6 +777,9 @@ class User:
     def is_ghost_of(self, nick):
         return self.host == UserMask(self.irc, nick).user.host
 
+    def modes_in(self, channel):
+        return self.channel_modes.get(channel.lower(), '')
+
     def joined(self, channel):
         assert not self.deleted, 'Deleted user'
 
