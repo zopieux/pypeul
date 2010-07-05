@@ -29,7 +29,7 @@ import socket
 import threading
 import re
 import sys
-from collections import namedtuple, Callable
+from collections import namedtuple, Callable, UserDict
 from textwrap import wrap
 
 RE_COLOR = re.compile(r'\x03(\d{1,2})?(?:,(\d{1,2})?)?')
@@ -219,8 +219,8 @@ class IRC(object):
         self.connected = False
         self.enabled = True
 
-        self.bans = {}
-        self.users = {}
+        self.bans = IrcDict()
+        self.users = IrcDict()
         self.myself = None
         self.serverconf = ServerConfig()
         self.handlers = {}
@@ -236,11 +236,11 @@ class IRC(object):
         self.log('@ Connecting to %s port %d' % (host, port))
 
         self.sk = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        
+
         if use_ssl:
             import ssl
             self.sk = ssl.wrap_socket(self.sk)
-        
+
         self.sk.connect((host, port))
 
         self.log('@ Connected')
@@ -454,7 +454,6 @@ class IRC(object):
             return (not bool(val), name, val)
 
         m = tuple(sorted(modes, key=_key))
-        print(repr(m))
 
         if not m:
             return
@@ -492,7 +491,7 @@ class IRC(object):
             self.send('MODE', target, modenames, *modevals)
 
     def retrieve_ban_list(self, chan):
-        self.bans[irc_lower(chan)] = []
+        self.bans[chan] = []
         self.send('MODE', chan, '+b')
 
     def ctcp_request(self, to, type, value = None):
@@ -604,10 +603,9 @@ class IRC(object):
             self.send('PONG', last=params[0])
 
         elif cmd == 'NICK' and umask:
-            olduser = irc_lower(umask.user.nick)
-            umask.user.nick = params[0]
-            self.users[irc_lower(params[0])] = umask.user
-            del self.users[olduser]
+            oldnick, newnick = umask.user.nick, params[0]
+            self.users.rename_key(oldnick, newnick)
+            umask.user.nick = newnick
 
         elif cmd == 'welcome':
             self._callback('on_ready')
@@ -628,7 +626,7 @@ class IRC(object):
                         self.send('PROTOCTL', 'NAMESX')
 
         elif cmd == 'banlist':
-            chan = irc_lower(params[1])
+            chan = params[1]
 
             if not chan in self.bans:
                 self.bans[chan] = []
@@ -636,8 +634,8 @@ class IRC(object):
             self.bans[chan].append(params[2:])
 
         elif cmd == 'endofbanlist':
-            chan = irc_lower(params[1])
-            self._callback('on_banlist_received', params[1], self.bans[chan])
+            chan = params[1]
+            self._callback('on_banlist_received', chan, self.bans[chan])
 
         elif cmd == 'namreply':
             channel = params[2]
@@ -649,7 +647,7 @@ class IRC(object):
                 nick = raw_nick[len(modes):]
                 user = UserMask(self, nick).user
                 user.joined(channel)
-                user.channel_modes[irc_lower(channel)] = set(modes)
+                user.channel_modes[channel] = set(modes)
 
         elif cmd == 'PRIVMSG':
             if params[1].startswith('\1') and params[1].endswith('\1'):
@@ -702,7 +700,7 @@ class IRC(object):
             for add, mode, value in self.parse_modes(modestr, targets):
                 if mode in self.serverconf.user_level_modes:
                     user = UserMask(self, value).user
-                    mode_set =  user.channel_modes[irc_lower(chan)]
+                    mode_set =  user.channel_modes[chan]
 
                     if add:
                         mode_set.add(mode)
@@ -741,8 +739,8 @@ class UserMask(object):
         else:
             self.nick = mask
 
-        if irc_lower(self.nick) in self.irc.users:
-            self.user = self.irc.users[irc_lower(self.nick)]
+        if self.nick in self.irc.users:
+            self.user = self.irc.users[self.nick]
 
             if self.host and self.host != self.user.host:
                 self.user.host = self.host # host can change (mode x)
@@ -750,7 +748,7 @@ class UserMask(object):
                 self.user.ident = self.ident
         else:
             self.user = User(self)
-            self.irc.users[irc_lower(self.nick)] = self.user
+            self.irc.users[self.nick] = self.user
 
     def __repr__(self):
         return '<UserMask: {0}!{1}@{2}>'.format(self.nick, self.ident, self.host)
@@ -765,20 +763,20 @@ class User:
         self.host = mask.host
         self.irc = mask.irc
         self.channels = []
-        self.channel_modes = {}
+        self.channel_modes = IrcDict()
         self.deleted = False
         
-        if irc_lower(self.nick) in self.irc.users:
+        if self.nick in self.irc.users:
             raise AssertionError('This is not supposed to happen.')
 
     def is_in(self, channel):
-        return irc_lower(channel) in map(irc_lower, self.channels)
+        return channel in self.channels
 
     def is_ghost_of(self, nick):
         return self.host == UserMask(self.irc, nick).user.host
 
     def modes_in(self, channel):
-        return self.channel_modes.get(channel.lower(), '')
+        return self.channel_modes.get(channel, '')
 
     def joined(self, channel):
         assert not self.deleted, 'Deleted user'
@@ -787,7 +785,7 @@ class User:
             return
 
         self.channels.append(channel)
-        self.channel_modes[irc_lower(channel)] = set()
+        self.channel_modes[channel] = set()
 
     def left(self, channel):
         assert not self.deleted, 'Deleted user'
@@ -799,7 +797,7 @@ class User:
                 self.channels.remove(chan)
 
         try:
-            del self.channel_modes[irc_lower(channel)]
+            del self.channel_modes[channel]
         except KeyError:
             pass
 
@@ -809,7 +807,7 @@ class User:
             self.left(chan)
 
         self.deleted = True
-        del self.irc.users[irc_lower(self.nick)]
+        del self.irc.users[self.nick]
 
     def __repr__(self):
         return '<{0}User: {1}!{2}@{3}>'.format('Deleted ' if self.deleted else '',
@@ -818,6 +816,38 @@ class User:
     def __str__(self):
         return self.nick
 
+class NormalizedDict(UserDict):
+    def __init__(self, *args,  **kwargs):
+        self._map = {}
+        self.function = str.lower
+        super(NormalizedDict, self).__init__(*args, **kwargs)
+
+    def __contains__(self, key):
+        return key in self._map
+
+    def __getitem__(self, key):
+        return self.data[self._map[self.function(key)]]
+
+    def __setitem__(self, key, value):
+        if key in self:
+            self.data[self._map[self.function(key)]] = value
+        else:
+            self._map[self.function(key)] = key
+            self.data[key] = value
+
+    def __delitem__(self, key):
+        del self.data[self._map[self.function(key)]]
+        del self._map[self.function(key)]
+
+    def rename_key(self, oldkey, newkey):
+        val = self[oldkey]
+        self[newkey] = val
+        del self[oldkey]
+
+class IrcDict(NormalizedDict):
+    def __init__(self, *args, **kwargs):
+        self.function = irc_lower
+        super(IrcDict, self).__init__(*args, **kwargs)
 
 numeric_events = {
     "001": "welcome",
