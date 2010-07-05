@@ -817,9 +817,10 @@ class User:
         return self.nick
 
 class NormalizedDict(UserDict):
+    function = staticmethod(str.lower)
+
     def __init__(self, *args,  **kwargs):
         self._map = {}
-        self.function = str.lower
         super(NormalizedDict, self).__init__(*args, **kwargs)
 
     def __contains__(self, key):
@@ -841,13 +842,11 @@ class NormalizedDict(UserDict):
 
     def rename_key(self, oldkey, newkey):
         val = self[oldkey]
-        self[newkey] = val
         del self[oldkey]
+        self[newkey] = val
 
 class IrcDict(NormalizedDict):
-    def __init__(self, *args, **kwargs):
-        self.function = irc_lower
-        super(IrcDict, self).__init__(*args, **kwargs)
+    function = staticmethod(irc_lower)
 
 numeric_events = {
     "001": "welcome",
