@@ -647,7 +647,7 @@ class IRC(object):
                 nick = raw_nick[len(modes):]
                 user = UserMask(self, nick).user
                 user.joined(channel)
-                user.channel_modes[channel] = set(modes)
+                user.channels[channel] = set(modes)
 
         elif cmd == 'PRIVMSG':
             if params[1].startswith('\1') and params[1].endswith('\1'):
@@ -700,7 +700,7 @@ class IRC(object):
             for add, mode, value in self.parse_modes(modestr, targets):
                 if mode in self.serverconf.user_level_modes:
                     user = UserMask(self, value).user
-                    mode_set =  user.channel_modes[chan]
+                    mode_set =  user.modes_in(chan)
 
                     if add:
                         mode_set.add(mode)
@@ -762,8 +762,7 @@ class User:
         self.ident = mask.ident
         self.host = mask.host
         self.irc = mask.irc
-        self.channels = []
-        self.channel_modes = IrcDict()
+        self.channels = IrcDict()
         self.deleted = False
         
         if self.nick in self.irc.users:
@@ -776,7 +775,7 @@ class User:
         return self.host == UserMask(self.irc, nick).user.host
 
     def modes_in(self, channel):
-        return self.channel_modes.get(channel, '')
+        return self.channels[channel]
 
     def joined(self, channel):
         assert not self.deleted, 'Deleted user'
@@ -784,25 +783,18 @@ class User:
         if self.is_in(channel):
             return
 
-        self.channels.append(channel)
-        self.channel_modes[channel] = set()
+        self.channels[channel] = set()
 
     def left(self, channel):
         assert not self.deleted, 'Deleted user'
         if not self.is_in(channel):
             return
-
-        for chan in self.channels:
-            if irc_equals(chan, channel):
-                self.channels.remove(chan)
-
         try:
-            del self.channel_modes[channel]
+            del self.channels[channel]
         except KeyError:
             pass
 
     def delete(self):
-
         for chan in self.channels:
             self.left(chan)
 
@@ -824,7 +816,7 @@ class NormalizedDict(UserDict):
         super(NormalizedDict, self).__init__(*args, **kwargs)
 
     def __contains__(self, key):
-        return key in self._map
+        return self.function(key) in self._map
 
     def __getitem__(self, key):
         return self.data[self._map[self.function(key)]]
