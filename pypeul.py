@@ -231,6 +231,9 @@ class IRC(object):
     def is_me(self, user):
         return irc_equals(str(user), str(self.myself))
 
+    def users_in(self, channel):
+        return [u for u in self.users.values() if u.is_in(channel)]
+
     def connect(self, host, port = 6667, use_ssl=False):
         '''Etablish a connection to a server'''
         self.log('@ Connecting to %s port %d' % (host, port))
