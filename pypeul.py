@@ -798,9 +798,7 @@ class User:
             pass
 
     def delete(self):
-        for chan in self.channels:
-            self.left(chan)
-
+        self.channels = IrcDict()
         self.deleted = True
         del self.irc.users[self.nick]
 
