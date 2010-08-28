@@ -600,6 +600,19 @@ class IRC(object):
 
         cmd = numeric_events.get(cmd, cmd.upper())
 
+        if cmd in ('JOIN', 'PART', 'KICK'):
+            self._callback('on_pre_server_' + cmd.lower(), umask, *params)
+
+            chan = params[0]
+            target = (UserMask(self, params[1]) if cmd == 'KICK' else umask)
+
+            if cmd == 'JOIN':
+                target.user.joined(chan)
+            else:
+                target.user.left(chan)
+        elif cmd == 'QUIT':
+            umask.user.delete()
+
         self._callback('on_server_' + cmd.lower(), umask, *params)
 
         if cmd == 'PING':
@@ -713,16 +726,6 @@ class IRC(object):
         elif umask and self.is_me(umask):
             self._callback('on_self_' + cmd.lower(), *params)
 
-        if cmd in ('JOIN', 'PART', 'KICK'):
-            chan = params[0]
-            target = (UserMask(self, params[1]) if cmd == 'KICK' else umask)
-
-            if cmd == 'JOIN':
-                target.user.joined(chan)
-            else:
-                target.user.left(chan)
-        elif cmd == 'QUIT':
-            umask.user.delete()
 
 class UserMask(object):
     maskRegex = re.compile(r'([^!]+)!([^@]+)@(.+)')
