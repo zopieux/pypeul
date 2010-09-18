@@ -89,7 +89,7 @@ class TestBot(IRC):
         self.ctcp_reply(umask.nick, 'PING', value)
 
     def on_ctcp_version_request(self, umask, value):
-        self.ctcp_reply(umask.nick, 'VERSION', sys.modules['irclib'].__version__)
+        self.ctcp_reply(umask.nick, 'VERSION', sys.modules['pypeul'].__version__)
 
     def nick_guess(self, part, channel):
         """
