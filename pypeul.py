@@ -261,7 +261,7 @@ class IRC(object):
             except IOError:
                 break
 
-            if txt == '':
+            if txt == b'':
                 break
 
             self._process_message(txt.strip(b'\r\n'))
