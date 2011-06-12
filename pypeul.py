@@ -20,6 +20,7 @@
 #
 # You should have received a copy of the GNU Lesser General Public
 # License along with pypeul. If not, see <http://www.gnu.org/licenses/>.
+
 __version__ = 'Pypeul python IRC client library v0.2 by Mick@el & Zopieux'
 
 ENCODING = 'utf-8'
@@ -28,11 +29,11 @@ import socket
 import threading
 import re
 import sys
-import codecs
+import io
 from collections import namedtuple, Callable, UserDict
 from textwrap import wrap
 
-sys.stdout = codecs.getwriter(sys.stdout.encoding)(sys.stdout.detach(), 'backslashreplace')
+sys.stdout = io.TextIOWrapper(sys.stdout.detach(), errors='backslashreplace', line_buffering=True)
 
 RE_COLOR = re.compile(r'\x03(\d{1,2})?(?:,(\d{1,2})?)?')
 
