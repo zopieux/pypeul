@@ -163,7 +163,7 @@ class ServerConfig(object):
         self.info = {
         'CHANMODES': 'ovb,k,l,psitnm',
         'PREFIX': '(ov)@+',
-        'MAXLIST': 'b:10,e:10,I:10', # arbitrary
+        'MAXLIST': 'beI:10', # arbitrary
         'MODES' : '3',
         }
 
@@ -182,8 +182,12 @@ class ServerConfig(object):
 
     @property
     def maxlists(self):
-        return dict((_.split(':')[0], int(_.split(':')[1]))
-            for _ in self.info['MAXLIST'].split(','))
+        ret = {}
+        for modes, limit in (_.split(':') for _ in self.info['MAXLIST'].split(',')):
+            for mode in modes:
+                ret[mode] = limit
+
+        return ret
 
     @property
     def mode_targets(self):
@@ -718,7 +722,7 @@ class IRC(object):
             for add, mode, value in self.parse_modes(modestr, targets):
                 if mode in self.serverconf.user_level_modes:
                     user = UserMask(self, value).user
-                    mode_set =  user.modes_in(chan)
+                    mode_set = user.modes_in(chan)
 
                     if add:
                         mode_set.add(mode)
