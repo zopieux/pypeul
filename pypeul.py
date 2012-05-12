@@ -59,7 +59,7 @@ class _tags(object):
         'blue' : '02',
         'green': '03',
         'red': '04',
-        'brown ' : '05',
+        'brown' : '05',
         'purple' : '06',
         'orange' : '07',
         'yellow' : '08',
