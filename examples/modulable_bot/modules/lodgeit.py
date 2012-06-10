@@ -8,12 +8,12 @@
 #
 # Copyright (c) 2010 Pierre Bourdon <delroth@gmail.com>
 #
-# irclib is free software: you can redistribute it and/or modify
+# pypeul is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as
 # published by the Free Software Foundation, either version 3 of
 # the License, or (at your option) any later version.
 #
-# irclib is distributed in the hope that it will be useful,
+# pypeul is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU Lesser General Public License for more details.
@@ -21,7 +21,7 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with pypeul. If not, see <http://www.gnu.org/licenses/>.
 
-import xmlrpclib
+import xmlrpc.client
 import os
 from pypeul import Tags
 
@@ -31,9 +31,9 @@ SHOW = 'http://paste.pocoo.org/show/%s/'
 class Lodgeit(object):
     def __init__(self, bot):
         self.bot = bot
-        self.lodgeit = xmlrpclib.ServerProxy(XMLRPC, allow_none=True)
+        self.lodgeit = xmlrpc.client.ServerProxy(XMLRPC, allow_none=True)
 
-    def on_server_privmsg(self, umask, target, msg):
+    def on_message(self, umask, target, msg):
         if msg.startswith('!paste'):
             cmd, args = msg.split()[0], msg.split()[1:]
             if cmd == '!paste':
@@ -42,7 +42,7 @@ class Lodgeit(object):
                 self.react(target, args, private=True)
 
     def help(self, cmd, args):
-        out = u'%s: %s %s' % (Tags.Green('usage'), Tags.Bold(cmd), args)
+        out = '%s: %s %s' % (Tags.Green('usage'), Tags.Bold(cmd), args)
         self.bot.message(target, out)
 
     def react(self, target, args, private):
@@ -51,8 +51,13 @@ class Lodgeit(object):
             self.help(cmd, '<filename> [filename2] ... [filenameN]')
         else:
             for fn in args:
-                id = self.paste(fn, private)
-                out = u'%s : %s' % (fn, SHOW % id)
+                try:
+                    id = self.paste(fn, private)
+                except IOError:
+                    self.bot.message(target, 'IOError.')
+                    return
+
+                out = '%s : %s' % (fn, SHOW % id)
                 self.bot.message(target, out)
 
     def paste(self, fn, private):

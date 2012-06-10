@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #-*- encoding: utf-8 -*-
 """
     Pypeul
@@ -17,7 +17,7 @@ from distutils.core import setup
 
 setup(
     name = 'Pypeul',
-    version = '0.1',
+    version = '0.2',
     url = 'http://bitbucket.org/zopieux/pypeul/',
     license = 'LGPL',
     author = 'Mick@el; Zopieux',
