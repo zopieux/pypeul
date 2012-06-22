@@ -452,6 +452,10 @@ class IRC(object):
         '''Kick user on chan'''
         self.send('KICK', chan, user, last=reason)
 
+    def invite(self, chan, user):
+        '''Invite an user on a channel'''
+        self.send('INVITE', chan, user)
+
     def quit(self, reason=''):
         self.send('QUIT', last=reason)
 
