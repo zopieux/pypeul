@@ -434,18 +434,22 @@ class IRC(object):
         '''Send a message to a nick / channel'''
         self.send_multi('PRIVMSG', target, last=text)
 
+    def action(self, target, text):
+        '''Send an action to a nick / channel'''
+        if len(text) > 445:
+            raise ValueError("Lenght of 'action' messages must be under 445 characters.")
+        self.message(target, '\x01ACTION ' + text + '\x01')
+
     def notice(self, target, text):
         '''Send a notice to a nick / channel'''
         self.send_multi('NOTICE', target, last=text)
 
     def topic(self, chan, newtopic):
         '''Change the topic of chan to newtopic'''
-
         self.send('TOPIC', chan, last=newtopic)
 
     def kick(self, chan, user, reason=''):
         '''Kick user on chan'''
-
         self.send('KICK', chan, user, last=reason)
 
     def quit(self, reason=''):
