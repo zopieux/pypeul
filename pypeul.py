@@ -508,7 +508,7 @@ class IRC(object):
         self.bans[chan] = []
         self.send('MODE', chan, '+b')
 
-    def ctcp_request(self, to, type, value = None):
+    def ctcp_request(self, to, type, value=''):
         type = str(type)
         value = str(value)
         self.message(to, '\1' + type + (' ' + value if value else '') + '\1')
