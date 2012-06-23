@@ -437,7 +437,8 @@ class IRC(object):
     def action(self, target, text):
         '''Send an action to a nick / channel'''
         if len(text) > 445:
-            raise ValueError("Lenght of 'action' messages must be under 445 characters.")
+            self.log("Warning: Length of 'action' messages must be under 445 characters.")
+            text = text[:445]
         self.message(target, '\x01ACTION ' + text + '\x01')
 
     def notice(self, target, text):
