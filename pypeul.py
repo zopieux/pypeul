@@ -736,7 +736,7 @@ class IRC:
 
         elif cmd == 'featurelist': # Server configuration string
             for i, param in enumerate(params[1:]):
-                if i == len(params) - 1:
+                if i == len(params):
                     break
 
                 try:
