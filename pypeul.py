@@ -735,7 +735,7 @@ class IRC:
             self._callback('on_ready')
 
         elif cmd == 'featurelist': # Server configuration string
-            for i, param in enumerate(params):
+            for i, param in enumerate(params[1:]):
                 if i == len(params) - 1:
                     break
 
