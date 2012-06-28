@@ -6,7 +6,7 @@
 
 # This file is part of pypeul.
 #
-# Copyright (c) 2010 Mick@el and Zopieux
+# Copyright (c) 2010-2012 Mick@el and Zopieux
 #
 # pypeul is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as
@@ -21,7 +21,7 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with pypeul. If not, see <http://www.gnu.org/licenses/>.
 
-__version__ = 'Pypeul python IRC client library v0.2 by Mick@el & Zopieux'
+__version__ = 'Pypeul python IRC client library v0.3 by Mick@el & Zopieux'
 
 ENCODING = 'utf-8'
 
@@ -30,12 +30,11 @@ import threading
 import re
 import sys
 import io
-from collections import namedtuple, Callable, UserDict
+from collections import namedtuple, Callable, UserDict, OrderedDict
 from textwrap import wrap
 
 sys.stdout = io.TextIOWrapper(sys.stdout.detach(), errors='backslashreplace', line_buffering=True)
 
-RE_COLOR = re.compile(r'\x03(\d{1,2})?(?:,(\d{1,2})?)?')
 
 # Decorator used to specify that a callbacks needs to be run in a thread
 def threaded(func):
@@ -52,7 +51,40 @@ def irc_lower(s):
 def irc_equals(s1, s2):
     return irc_lower(s1) == irc_lower(s2)
 
-class _tags(object):
+class Tags(object):
+    '''
+    This class is used to apply mIRC-style formatting to IRC text.
+
+    There are two types of tags : color tags and formatting tags that can be
+    toggled either on or off (those are Bold, Reverse, Underline).
+
+    Color are referred to using the following syntax :
+     - Tags.Red + 'hello'        # 'hello' in red
+     - Tags.RedBlue + 'hello'    # 'hello' in red on a blue background
+
+    The first color defines the foreground and the second one the backgroud.
+    Background color is optional.
+
+    On/off tags work the same way except each use will toggle the previous
+    state :
+     - Tags.Bold + 'hello'       # 'hello' in bold
+     - Tags.Bold + 'foo' + \
+         Tags.Bold + 'bar'       # 'foo' in bold, followed by 'bar' (no bold)
+
+    The two types can be combined as well :
+     - Tags.BoldGreen            # 'hello' in bold and green
+
+    It's also possible to call tags as functions instead of concatenating them
+    to enclose a string with a starting and ending tag :
+    - Tags.Bold('foo') + 'bar'   # 'foo' in bold, followed by 'bar' (no bold)
+
+    Colors work as well, but be warned that a color can not be turned off (you
+    must provide another color in order to change it)
+    - Tags.BoldRed('foo') + 'bar'  # 'foo' in bold red, and 'bar' in red !
+
+    '''
+    RE_COLOR = re.compile(r'\x03(\d{1,2})?(?:,(\d{1,2})?)?')
+
     Reset = '\x0f'
     Uncolor = '\x03'
 
@@ -81,7 +113,7 @@ class _tags(object):
     }
 
     def strip(self, text):
-        text = RE_COLOR.sub('', text)
+        text = Tags.RE_COLOR.sub('', text)
         for val in _tags.tags.values():
             text = text.replace(val[0], '')
         return text
@@ -157,9 +189,14 @@ class _tags(object):
 
         return self.callable_tag(format + color, format + uncolor)
 
-Tags = _tags()
+Tags = Tags()
 
-class ServerConfig(object):
+class ServerConfig:
+    '''
+    This classed is used to allow easy access to the RPL_ISUPPORT line returned
+    by most IRC servers, Please see http://www.irc.org/tech_docs/005.html for
+    more information.
+    '''
     def __init__(self):
         self.info = {
         'CHANMODES': 'ovb,k,l,psitnm',
@@ -178,45 +215,100 @@ class ServerConfig(object):
         return item in self.info
 
     @property
-    def chanmodes(self):
-        return namedtuple('chanmodes', ['user', 'string', 'numeric', 'normal'])._make(map(set, self.info['CHANMODES'].split(',')))
+    def chan_modes(self):
+        '''
+        This is a list of channel modes according to 4 types.
+        A = Mode that adds or removes a nick or address to a list. Always has a
+        parameter.
+        B = Mode that changes a setting and always has a parameter.
+        C = Mode that changes a setting and only has a parameter when set.
+        D = Mode that changes a setting and never has a parameter.
+
+        Note: Modes of type A return the list when there is no parameter present.
+        Note: Some clients assumes that any mode not listed is of type D.
+        Note: Modes in PREFIX are not listed but could be considered type B.
+        '''
+        return [set(_) for _ in self.info['CHANMODES'].split(',')]
 
     @property
-    def maxlists(self):
+    def max_lists_entries(self):
+        '''
+        Maximum number of entries in the list for each mode.
+        '''
         ret = {}
-        for modes, limit in (_.split(':') for _ in self.info['MAXLIST'].split(',')):
+        for token in self.info['MAXLIST'].split(','):
+            modes, limit = token.split(':')
             for mode in modes:
-                ret[mode] = limit
+                ret[mode] = int(limit)
 
         return ret
 
     @property
-    def mode_targets(self):
-        return int(self.info['MODES'])
+    def list_modes(self):
+        '''
+        A set of all type A modes (that add or remove to a list
+        such as a ban list)
+        '''
+        return set(self.max_lists_entries.keys()) | self.chan_modes[0]
 
     @property
-    def lists(self):
-        return set(self.maxlists.keys())
+    def prefixes(self):
+        '''
+        A list of channel modes a person can get and the respective prefix a
+        channel or nickname will get in case the person has it. The order of
+        the modes goes from most powerful to least powerful. Those prefixes are
+        shown in the output of the WHOIS, WHO and NAMES command.
 
-    @property
-    def prefixes_mapping(self):
+        Note: Some servers only show the most powerful, others may show all of
+        them.
+
+        The result is an ordered dict of mode -> prefix
+        '''
         left, right = self.info['PREFIX'].split(')')
-        return dict(zip(right, left[1:]))
+        return OrderedDict(zip(left[1:], right))
+
+    def mode_for_prefix(self, prefix):
+        '''
+        Get the mode for the given prefix
+        '''
+        index = list(self.prefixes.values()).index(prefix[0])
+        return list(self.prefixes.keys())[index]
 
     @property
     def prefixes_modes(self):
-        return set(self.prefixes_mapping.values())
+        '''
+        A set containing all the channel modes a person can get
+        '''
+        return set(self.prefixes.keys())
 
     @property
-    def user_level_modes(self):
-        '''Returns modes that apply to channel users (except lists like bans)'''
-        return (self.chanmodes.user - self.lists) | self.prefixes_modes
+    def max_modes(self):
+        '''
+        Maximum number of channel modes with a parameter
+        allowed for each MODE command.
+        '''
+        return int(self.info['MODES'])
 
     @property
     def param_modes(self):
-        '''Returns modes that take a parameter.'''
-        return self.chanmodes.user | self.chanmodes.string | \
-            self.chanmodes.numeric | self.prefixes_modes
+        '''
+        A set of all type B modes (which always have a parameter associated)
+        '''
+        return set(self.chan_modes[1]) | set(self.prefixes)
+
+    @property
+    def param_set_modes(self):
+        '''
+        A set of all type C modes (which always have a parameter when set)
+        '''
+        return set(self.chan_modes[2])
+
+    @property
+    def noparam_modes(self):
+        '''
+        A set of all type D modes (which never have a parameter associated)
+        '''
+        return set(self.chan_modes[3])
 
 class IRC(object):
     def __init__(self, loggingEnabled = True, thread_callbacks = False):
@@ -388,7 +480,7 @@ class IRC(object):
                             else:
                                 format.append(char)
                         elif char == '\x03':
-                            match = RE_COLOR.match(line[i-1:])
+                            match = Tags.RE_COLOR.match(line[i-1:])
 
                             if not match: # uncolor
                                 fgcolor = bgcolor = ''
@@ -653,7 +745,7 @@ class IRC(object):
 
                 except ValueError:
                     self.serverconf[param] = True
-                    
+
                     if param == 'NAMESX':
                         self.send('PROTOCTL', 'NAMESX')
 
@@ -786,7 +878,7 @@ class User:
         self.irc = mask.irc
         self.channels = IrcDict()
         self.deleted = False
-        
+
         if self.nick in self.irc.users:
             raise AssertionError('This is not supposed to happen.')
 
