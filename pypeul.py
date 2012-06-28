@@ -443,7 +443,7 @@ class IRC:
             format = []
 
             for unwrapped_line in last.split('\n'):
-                if not unwrapped_line.strip():
+                if not unwrapped_line.strip(): # get rid of empty lines
                     continue
 
                 if no_break:
@@ -452,6 +452,7 @@ class IRC:
                     wraps = wrap(unwrapped_line, 460 - len(' '.join(params)))
 
                 for wrapped_line in wraps:
+                    # add the formatting to the beginning of the line
                     line = ''.join(format)
 
                     if fgcolor or bgcolor:
@@ -459,6 +460,8 @@ class IRC:
 
                         if bgcolor:
                             line += ',' + bgcolor
+
+                    # now add the text itself
                     line += wrapped_line
 
                     self.send(*params, last=line.replace('\r',''))
@@ -482,7 +485,7 @@ class IRC:
                         elif char == '\x03':
                             match = Tags.RE_COLOR.match(line[i-1:])
 
-                            if not match: # uncolor
+                            if not match.group(1): # uncolor
                                 fgcolor = bgcolor = ''
                             else:
                                 if match.group(1):
