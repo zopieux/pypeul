@@ -51,7 +51,7 @@ def irc_lower(s):
 def irc_equals(s1, s2):
     return irc_lower(s1) == irc_lower(s2)
 
-class Tags(object):
+class Tags:
     '''
     This class is used to apply mIRC-style formatting to IRC text.
 
@@ -118,7 +118,7 @@ class Tags(object):
             text = text.replace(val[0], '')
         return text
 
-    class callable_tag(object):
+    class callable_tag:
         def __init__(self, start, end=''):
             self.start = start
             self.end = end
@@ -310,7 +310,7 @@ class ServerConfig:
         '''
         return set(self.chan_modes[3])
 
-class IRC(object):
+class IRC:
     def __init__(self, loggingEnabled = True, thread_callbacks = False):
         self.thread_callbacks = thread_callbacks
         self.loggingEnabled = loggingEnabled
@@ -835,7 +835,7 @@ class IRC(object):
             self._callback('on_self_' + cmd.lower(), *params)
 
 
-class UserMask(object):
+class UserMask:
     maskRegex = re.compile(r'([^!]+)!([^@]+)@(.+)')
 
     def __init__(self, irc, mask):
