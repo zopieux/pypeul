@@ -28,13 +28,12 @@ import sys
 class ModuleNotFound(Exception): pass
 
 class TestBot(IRC):
-    admins = ('mickael.is-a-geek.net', 'home.zopieux.com')
+    admins = ('jerrycraft.tk')
 
     def on_ready(self):
         self.join('#pypeul')
 
     def on_message(self, umask, target, msg):
-
         try:
             if msg.startswith('!colorize '):
                 words = msg[10:].split()

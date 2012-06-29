@@ -50,7 +50,7 @@ class Chain(object):
         last_r = None
         repeats = 5
         special_seqs = {}
-        url = 'http://www.research.att.com/~njas/sequences/?q=%s&n=1&fmt=3'
+        url = 'http://oeis.org/search?q=%s&n=1&fmt=text&go=Search'
 
         def format_float(self, f):
             if round(f, 10) == int(f):
