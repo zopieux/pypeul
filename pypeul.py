@@ -199,7 +199,7 @@ class ServerConfig:
     '''
     def __init__(self):
         self.info = {
-        'CHANMODES': 'ovb,k,l,psitnm',
+        'CHANMODES': 'b,k,l,psitnm',
         'PREFIX': '(ov)@+',
         'MAXLIST': 'beI:10', # arbitrary
         'MODES' : '3',
@@ -294,7 +294,7 @@ class ServerConfig:
         '''
         A set of all type B modes (which always have a parameter associated)
         '''
-        return set(self.chan_modes[1]) | set(self.prefixes)
+        return set(self.chan_modes[1]) | self.prefixes_modes
 
     @property
     def param_set_modes(self):
@@ -582,7 +582,7 @@ class IRC:
             i = 0
 
             while len(target + modenames + ' '.join(modevals)) < 450 \
-                and i < self.serverconf.mode_targets and j < len(m):
+                and i < self.serverconf.max_modes and j < len(m):
 
                 if isinstance(m[j], str):
                     name = m[j]
@@ -641,14 +641,18 @@ class IRC:
         out = []
 
         for char in modestr:
-            if char in ('+', '-'):
+            if char in '+-':
                 last = char
                 continue
 
             if last is None:
                 raise ValueError("Modes have to begin with + or -")
 
-            if char in self.serverconf.param_modes:
+            param_modes = self.serverconf.param_modes | self.serverconf.list_modes
+            if last == '+':
+                param_modes |= self.serverconf.param_set_modes
+
+            if char in param_modes:
                 out.append((last == '+', char, targets[i]))
                 i += 1
             else:
@@ -768,8 +772,8 @@ class IRC:
             channel = params[2]
 
             for raw_nick in params[3].split():
-                modes = [self.serverconf.prefixes_mapping[_]
-                    for _ in raw_nick if _ in ('@', '%', '+')]
+                modes = [self.serverconf.mode_for_prefix(_) for _ in raw_nick
+                         if _ in self.serverconf.prefixes.values()]
 
                 nick = raw_nick[len(modes):]
                 user = UserMask(self, nick).user
@@ -825,7 +829,9 @@ class IRC:
             targets = params[2:]
 
             for add, mode, value in self.parse_modes(modestr, targets):
-                if mode in self.serverconf.user_level_modes:
+                if mode in (self.serverconf.prefixes_modes \
+                            | self.serverconf.list_modes \
+                            - set(self.serverconf.max_lists_entries)):
                     user = UserMask(self, value).user
                     mode_set = user.modes_in(chan)
 
