@@ -34,7 +34,6 @@ import logging
 from collections import namedtuple, Callable, UserDict, OrderedDict
 from textwrap import wrap
 
-sys.stdout = io.TextIOWrapper(sys.stdout.detach(), errors='backslashreplace', line_buffering=True)
 
 
 # Decorator used to specify that a callbacks needs to be run in a thread
