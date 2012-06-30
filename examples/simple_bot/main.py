@@ -62,6 +62,10 @@ class SimpleBot(IRC):
 
 
 if __name__ == '__main__':
+    # Enable debug-level logging
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
+
     # Instanciate our SimpleBot class and let it run
     bot = SimpleBot()
     bot.connect('irc.epiknet.net', 6664)

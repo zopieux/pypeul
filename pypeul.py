@@ -30,6 +30,7 @@ import threading
 import re
 import sys
 import io
+import logging
 from collections import namedtuple, Callable, UserDict, OrderedDict
 from textwrap import wrap
 
@@ -43,6 +44,7 @@ def threaded(func):
 
     func.threaded = True
     return func
+logger = logging.getLogger(__name__)
 
 def irc_lower(s):
 	# TODO: better implementation
@@ -311,10 +313,8 @@ class ServerConfig:
         return set(self.chan_modes[3])
 
 class IRC:
-    def __init__(self, loggingEnabled = True, thread_callbacks = False):
+    def __init__(self, thread_callbacks=False):
         self.thread_callbacks = thread_callbacks
-        self.loggingEnabled = loggingEnabled
-
         self.connected = False
         self.enabled = True
 
@@ -335,7 +335,7 @@ class IRC:
 
     def connect(self, host, port = 6667, use_ssl=False):
         '''Etablish a connection to a server'''
-        self.log('@ Connecting to %s port %d' % (host, port))
+        logger.info('Connecting to %s port %d ...', host, port)
 
         self.sk = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -345,10 +345,8 @@ class IRC:
 
         self.sk.connect((host, port))
 
-        self.log('@ Connected')
-
+        logger.info('Connected successfully')
         self.connected = True
-
         self._callback('on_connected')
 
     def run(self):
@@ -363,12 +361,14 @@ class IRC:
             if txt == b'':
                 break
 
-            self._process_message(txt.strip(b'\r\n'))
+            try:
+                self._process_message(txt.strip(b'\r\n'))
+            except:
+                logger.exception("Exception raised while processing a message")
 
         self.connected = False
 
-        self.log('@ Disconnected')
-
+        logger.info('Disconnected')
         self._callback('on_disconnnected')
         self.enabled = False
 
@@ -379,16 +379,12 @@ class IRC:
 
         return thread
 
-    def log(self, txt):
-        if self.loggingEnabled:
-            print(txt)
-
     def raw(self, raw):
         '''Send a raw message to server'''
         # TODO make this thread-safe
         self.sk.send(raw.encode(ENCODING) + b'\r\n')
 
-        self.log('> ' + raw)
+        logger.debug('> ' + raw)
 
     def send(self, *params, last=''):
         """
@@ -531,9 +527,6 @@ class IRC:
 
     def action(self, target, text):
         '''Send an action to a nick / channel'''
-        if len(text) > 445:
-            self.log("Warning: Length of 'action' messages must be under 445 characters.")
-            text = text[:445]
         self.message(target, '\x01ACTION ' + text + '\x01')
 
     def notice(self, target, text):
@@ -666,7 +659,7 @@ class IRC:
             if not isinstance(f, Callable):
                 continue
 
-            self.log('calling %s() on instance %r' % (name, inst))
+            logger.debug('calling %s() on instance %r' % (name, inst))
 
             if self.thread_callbacks or getattr(f, 'threaded', None):
                 t = threading.Thread(target = f, args = parameters)
@@ -677,7 +670,7 @@ class IRC:
 
     def _process_message(self, text):
         text = list(map(self.to_unicode, text.split(b' ')))
-        self.log('< ' + ' '.join(text))
+        logger.debug('< ' + ' '.join(text))
 
         prefix = ''
 
@@ -889,7 +882,7 @@ class User:
         self.deleted = False
 
         if self.nick in self.irc.users:
-            raise AssertionError('This is not supposed to happen.')
+            logger.error("Tried instanciating multiple User instances for the same user.")
 
     def is_in(self, channel):
         return channel in self.channels
@@ -901,7 +894,9 @@ class User:
         return self.channels[channel]
 
     def joined(self, channel):
-        assert not self.deleted, 'Deleted user'
+        if self.deleted:
+            logger.error("joined() called on a deleted user")
+            return
 
         if self.is_in(channel):
             return
@@ -909,7 +904,10 @@ class User:
         self.channels[channel] = set()
 
     def left(self, channel):
-        assert not self.deleted, 'Deleted user'
+        if self.deleted:
+            logger.error("left() called on a deleted user")
+            return
+
         if not self.is_in(channel):
             return
         try:

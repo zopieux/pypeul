@@ -119,6 +119,10 @@ class TestBot(IRC):
             raise ModuleNotFound
 
 if __name__ == '__main__':
+    # Enable debug-level logging
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
+
     bot = TestBot()
     bot.connect('irc.epiknet.net', 7002, True)
     bot.ident('TestBot')
