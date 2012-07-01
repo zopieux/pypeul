@@ -608,13 +608,12 @@ class IRC:
         a space.
 
         Other arguments can not contain space, newlines or begin with a ':'
+        Every argument will be converted into a string using str()
         """
 
         prefix = self._get_prefix(params)
 
-        if isinstance(last, Tags.ChunkList):
-            last = str(last)
-
+        last = str(last)
         last = ' '.join(x.strip('\r') for x in last.split('\n'))
 
         if last:
@@ -627,12 +626,16 @@ class IRC:
         Send a command multiple times to the server.
         For each newline in the last argument, the command will be repeated.
 
-        The text will be parsed for format codes and will be split into words
-        to allow intelligent line breaking of too long line (at chunk borders)
+        The 'last' argument will be parsed for format codes and will be split
+        into words to allow intelligent line breaking of too long line.
+        Whenever possible, the line breaking algorithm will cut at a chunk
+        boundary (at the end of a word or before a formatting tag)
 
         This behaviour can be disabled by passing the no_break=True argument.
         Keep in mind that by doing so, lines that are too long will be
         truncated by the IRC server.
+
+        Every other argument will be converted into a string using str()
         """
 
         prefix = self._get_prefix(params)
@@ -648,7 +651,7 @@ class IRC:
         max_limit = 450 - len(prefix) # forced break at this limit
 
         if not isinstance(last, Tags.ChunkList):
-            last = Tags.parse(last)
+            last = Tags.parse(str(last))
 
         last = last.split_words()
 
