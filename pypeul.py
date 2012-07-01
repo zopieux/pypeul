@@ -176,6 +176,7 @@ class Tags:
                 else:
                     chunk.fgcolor = ''
                     chunk.bgcolor = ''
+                    chunk.tags.add('uncolor')
 
                 i += len(match.group(0))
                 continue
