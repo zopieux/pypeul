@@ -127,7 +127,6 @@ if __name__ == '__main__':
     bot.connect('irc.epiknet.net', 7002, True)
     bot.ident('TestBot')
     bot.load_module('arok')
-    bot.load_module('chain')
     bot.load_module('snippet')
 
     bot.run()
