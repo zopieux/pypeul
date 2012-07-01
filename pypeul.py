@@ -345,7 +345,7 @@ class Tags:
 
             if end:
                 if fg or bg:
-                    ret += Tags.format['uncolor']
+                    ret += Tags.formats['uncolor']
                 for tag in tags - {'uncolor', 'reset'}:
                     ret += Tags.formats[tag]
 
