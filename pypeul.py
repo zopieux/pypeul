@@ -334,8 +334,8 @@ class Tags:
                         ret += ',' + Tags.colors[chunk.bgcolor]
 
                 if ret.endswith(Tags.formats['uncolor']) and (
-                        chunk.text[-0:1].isdigit() or \
-                        chunk.text[0:1] == ','):
+                        chunk.text[:1].isdigit() or \
+                        chunk.text[:1] == ','):
                     ret += 2 * Tags.formats['bold'] # workaround
 
                 ret += chunk.text
