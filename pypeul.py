@@ -231,10 +231,20 @@ class Tags:
             else:
                 raise AttributeError("Invalid keyword : %r" % keyword)
 
-        def Tag(value):
-            return Tags.ChunkList([value], fgcolor, bgcolor, formats)
+        class Tag:
+            def __call__(self, value):
+                return Tags.ChunkList([value], fgcolor, bgcolor, formats)
 
-        return Tag
+            def __str__(self):
+                return Tags.ChunkList([''], fgcolor, bgcolor, formats).to_string()
+
+            def __add__(self, other):
+                return str(self) + str(other)
+
+            def __radd__(self, other):
+                return str(other) + str(self)
+
+        return Tag()
 
     class ChunkList:
         def __init__(self, children=None, fgcolor='', bgcolor='', tags=None):
