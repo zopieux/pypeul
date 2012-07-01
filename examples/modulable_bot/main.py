@@ -82,7 +82,7 @@ class TestBot(IRC):
 
         except Exception as ex:
             self.message(target, Tags.Bold('Exception : ') + repr(ex))
-            #raise
+            raise
 
     def on_ctcp_ping_request(self, umask, value):
         self.ctcp_reply(umask.nick, 'PING', value)
