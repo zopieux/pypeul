@@ -627,11 +627,22 @@ class IRC:
         Send a command multiple times to the server.
         For each newline in the last argument, the command will be repeated.
 
-        Newlines are added automatically in order to avoid reaching
-        the line length limit, unless no_break is set (not recommended)
+        The text will be parsed for format codes and will be split into words
+        to allow intelligent line breaking of too long line (at chunk borders)
+
+        This behaviour can be disabled by passing the no_break=True argument.
+        Keep in mind that by doing so, lines that are too long will be
+        truncated by the IRC server.
         """
 
         prefix = self._get_prefix(params)
+
+        if no_break:
+            last = str(last)
+
+            for line in last.split('\n'):
+                self.raw(prefix + ' :' + line)
+            return
 
         # FIXME: might be too small if you have a long nickname
         max_limit = 450 - len(prefix) # forced break at this limit
