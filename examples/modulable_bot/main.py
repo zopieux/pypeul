@@ -75,7 +75,7 @@ class TestBot(IRC):
                 return
 
             if msg.startswith('!dump '):
-                self.message(target, str(eval(msg[6:])))
+                self.message(target, eval(msg[6:]))
 
             elif msg.startswith('!exec '):
                 exec(msg[6:], locals(), globals())

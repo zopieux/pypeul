@@ -308,6 +308,9 @@ class Tags:
             return new_chunklist
 
         def __str__(self):
+            return self.to_string(end=True)
+
+        def to_string(self, end=False):
             fg, bg = '', ''
             tags = set()
             ret = ''
@@ -340,6 +343,12 @@ class Tags:
 
                 fg, bg = chunk.fgcolor, chunk.bgcolor
                 tags = chunk.tags.copy() - {'reset', 'uncolor'}
+
+            if end:
+                if fg or bg:
+                    ret += Tags.format['uncolor']
+                for tag in tags - {'uncolor', 'reset'}:
+                    ret += Tags.formats[tag]
 
             return ret
 
@@ -613,7 +622,11 @@ class IRC:
 
         prefix = self._get_prefix(params)
 
-        last = str(last)
+        if isinstance(last, Tags.ChunkList):
+            last = last.to_string()
+        else:
+            last = str(last)
+
         last = ' '.join(x.strip('\r') for x in last.split('\n'))
 
         if last:
@@ -641,7 +654,10 @@ class IRC:
         prefix = self._get_prefix(params)
 
         if no_break:
-            last = str(last)
+            if isinstance(last, Formats.ChunkList):
+                last = last.to_string()
+            else:
+                last = str(last)
 
             for line in last.split('\n'):
                 self.raw(prefix + ' :' + line)
@@ -681,7 +697,7 @@ class IRC:
                     next_chunks.insert(1, half2)
 
                 chunklist = Tags.ChunkList(next_chunks[:complete_chunks])
-                self.raw(prefix + ' :' + str(chunklist))
+                self.raw(prefix + ' :' + chunklist.to_string())
                 next_chunks = next_chunks[complete_chunks:]
 
     def ident(self, nick, ident = None,
