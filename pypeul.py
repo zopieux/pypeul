@@ -34,8 +34,6 @@ import logging
 from collections import namedtuple, Callable, UserDict, OrderedDict
 from textwrap import wrap
 
-
-
 # Decorator used to specify that a callbacks needs to be run in a thread
 def threaded(func):
     if not func.__name__.lower().startswith('on_'):
@@ -43,6 +41,7 @@ def threaded(func):
 
     func.threaded = True
     return func
+
 logger = logging.getLogger(__name__)
 
 def irc_lower(s):
@@ -54,41 +53,37 @@ def irc_equals(s1, s2):
 
 class Tags:
     '''
-    This class is used to apply mIRC-style formatting to IRC text.
+    This class is used to represent mIRC-style formatted text
 
-    There are two types of tags : color tags and formatting tags that can be
-    toggled either on or off (those are Bold, Reverse, Underline).
+    Here are a few examples of the syntax :
 
-    Color are referred to using the following syntax :
-     - Tags.Red + 'hello'        # 'hello' in red
-     - Tags.RedBlue + 'hello'    # 'hello' in red on a blue background
+    >>> Tags.Bold('foo') + 'bar'
+    ChunkList([<Chunk('foo', bold)>, <Chunk('bar')>])
 
-    The first color defines the foreground and the second one the backgroud.
-    Background color is optional.
+    >>> Tags.BoldRed('foo') + 'bar'
+    ChunkList([<Chunk('foo', fgcolor='red', bold)>, <Chunk('bar')>])
 
-    On/off tags work the same way except each use will toggle the previous
-    state :
-     - Tags.Bold + 'hello'       # 'hello' in bold
-     - Tags.Bold + 'foo' + \
-         Tags.Bold + 'bar'       # 'foo' in bold, followed by 'bar' (no bold)
+    >>> Tags.UnderlineRed("This is " + Tags.BoldBlue("SPARTAAAAA!!!"))
+    ChunkList([<Chunk('This is ', fgcolor='red', underline)>, <Chunk('SPARTAAAAA!!!', fgcolor='blue', bold, underline)>])
 
-    The two types can be combined as well :
-     - Tags.BoldGreen            # 'hello' in bold and green
+    >>> Tags.BoldYellowBlue("This text is yellow on a blue background")
+    ChunkList([<Chunk('This text is yellow on a blue background', fgcolor='yellow', bgcolor='blue', bold)>])
 
-    It's also possible to call tags as functions instead of concatenating them
-    to enclose a string with a starting and ending tag :
-    - Tags.Bold('foo') + 'bar'   # 'foo' in bold, followed by 'bar' (no bold)
+    The first and second color names are respectively foreground and background colors.
+    Other tags may be put in any other place.
+    The keywords are case-insensitive (Tags.boldred("hello") works as well)
 
-    Colors work as well, but be warned that a color can not be turned off (you
-    must provide another color in order to change it)
-    - Tags.BoldRed('foo') + 'bar'  # 'foo' in bold red, and 'bar' in red !
+    The result is a ChunkList object that will be automatically converted when sent over IRC.
+    str() can also be used to force the conversion
 
+    The following tags are defined : Bold, Underline, Reverse, Reset
+
+    Some notes about nested tags :
+        - child tag will inherit the parent's background color, unless it has Reset or Uncolor attribute (or another background color)
+        - child tag always has priority over the parent : Tags.Red(Tags.Blue("...")) will be blue
     '''
+
     RE_COLOR = re.compile(r'\x03(\d{1,2})?(?:,(\d{1,2})?)?')
-
-    Reset = '\x0f'
-    Uncolor = '\x03'
-
     colors = {
         'white' : '00',
         'black' : '01',
@@ -105,90 +100,283 @@ class Tags:
         'ltblue' : '12',
         'pink' : '13',
         'grey' : '14',
-        'ltgrey' : '15'}
-
-    tags = {
-        'bold' : '\x02',
-        'underline' : '\x1f',
-        'reverse' : '\x16',
+        'ltgrey' : '15'
     }
 
+    color_names = list(colors.keys())
+    color_codes = [int(x) for x in colors.values()]
+
+    formats = {
+        'reset' : '\x0f',
+        'uncolor' : '\x03',
+        'bold' : '\x02',
+        'underline' : '\x1f',
+        'reverse' : '\x16'
+    }
+
+    formats_names = list(formats.keys())
+    formats_codes = list(formats.values())
+
+    def color_name_by_code(self, n):
+        return self.color_names[self.color_codes.index(n)]
+
+    def format_name_by_code(self, code):
+        return self.formats_names[self.formats_codes.index(code)]
+
+    keywords = tuple(colors) + tuple(formats)
+
     def strip(self, text):
+        '''
+        Strip all mIRC formatting codes in a string
+        '''
+
         text = Tags.RE_COLOR.sub('', text)
-        for val in _tags.tags.values():
-            text = text.replace(val[0], '')
+        for val in Tags.formats.values():
+            text = text.replace(val, '')
+
         return text
 
-    class callable_tag:
-        def __init__(self, start, end=''):
-            self.start = start
-            self.end = end
+    def parse(self, text):
+        '''
+        Parse a mIRC-formatted text into a ChunkList object
+        '''
 
-        def __add__(self, other):
-            if isinstance(other, str):
-                return str(self) + other
-            elif isinstance(other, _tags.callable_tag):
-                return str(self) + str(other)
-            else:
-                raise TypeError
+        chunks = []
+        chunk = Tags.Chunk()
+        i = 0
 
-        def __radd__(self, other):
-            if isinstance(other, str):
-                return other + str(self)
-            elif isinstance(other, _tags.callable_tag):
-                return str(other) + str(self)
-            else:
-                raise TypeError
+        while i < len(text):
+            char = text[i]
 
-        def __str__(self):
-            return self.start
+            try:
+                fmt = self.format_name_by_code(char)
+            except ValueError:
+                fmt = None
 
-        def __call__(self, *params):
-            return self.start + ' '.join(params) + self.end
+            if fmt and chunk.text:
+                chunks.append(chunk)
+                chunk = Tags.Chunk()
+                chunk.tags |= chunks[-1].tags - {'reset', 'uncolor'}
+                chunk.fgcolor = chunks[-1].fgcolor
+                chunk.bgcolor = chunks[-1].bgcolor
 
-    def __getattr__(self, name):
-        fg = None
-        bg = None
-        format = ''
-        buffer = ''
+            if fmt == 'reset':
+                chunk.fgcolor = ''
+                chunk.bgcolor = ''
+                chunk.tags = set()
 
-        for char in name:
-            buffer += char.lower()
-            found = True
-            if buffer in self.colors:
-                if fg is None:
-                    fg = self.colors[buffer]
-                elif bg is None:
-                    bg = self.colors[buffer]
+            if fmt == 'uncolor':
+                match = self.RE_COLOR.search(text[i:])
+                fg, bg = match.groups()
+
+                if fg:
+                    chunk.fgcolor = self.color_name_by_code(int(fg))
+                    if bg:
+                        chunk.bgcolor = self.color_name_by_code(int(bg))
                 else:
-                    raise AttributeError(name)
-            elif buffer in self.tags:
-                if self.tags[buffer] in format:
-                    raise AttributeError(name)
-                format += self.tags[buffer]
-            elif buffer == 'none':
-                if fg is None and bg is None:
-                    fg = ''
+                    chunk.fgcolor = ''
+                    chunk.bgcolor = ''
+                    chunk.tags.add('uncolor')
+
+                i += len(match.group(0))
+                continue
+
+            if fmt:
+                if fmt in chunk.tags:
+                    chunk.tags.remove(fmt)
                 else:
-                    raise AttributeError(name)
+                    chunk.tags.add(fmt)
             else:
-                found = False
+                chunk.text += char
 
-            if found:
-                buffer = ''
+            i += 1
 
-        if buffer or (fg == '' and bg is None):
+        chunks.append(chunk)
+        return self.ChunkList(chunks)
+
+    def _next_keyword(self, name):
+        found = ''
+
+        for keyword in self.keywords:
+            if name.lower().startswith(keyword):
+                found = keyword
+                name = name[len(keyword):]
+                break
+
+        if not found:
             raise AttributeError(name)
 
-        color = ''
-        uncolor = ''
-        if fg is not None:
-            uncolor = '\x03'
-            color = '\x03' + fg
-            if bg:
-                color += ',' + bg
+        return keyword, name
 
-        return self.callable_tag(format + color, format + uncolor)
+    def __getattr__(self, name):
+        fgcolor = ''
+        bgcolor = ''
+        formats = set()
+
+        while name:
+            keyword, name = self._next_keyword(name)
+
+            if keyword in self.colors:
+                if not fgcolor:
+                    fgcolor = keyword
+                elif not bgcolor:
+                    bgcolor = keyword
+                else:
+                    raise AttributeError("You can't have more than 2 colors !")
+            elif keyword in self.formats:
+                if keyword in formats:
+                    raise AttributeError("You specified the same format twice !")
+                else:
+                    formats.add(keyword)
+            else:
+                raise AttributeError("Invalid keyword : %r" % keyword)
+
+        def Tag(value):
+            return Tags.ChunkList([value], fgcolor, bgcolor, formats)
+
+        return Tag
+
+    class ChunkList:
+        def __init__(self, children=None, fgcolor='', bgcolor='', tags=None):
+            children = children or []
+            self.children = []
+
+            for child in children:
+                if isinstance(child, Tags.Chunk):
+                    self.children.append(child)
+
+                elif isinstance(child, Tags.ChunkList):
+                    self.children.extend(child.children)
+                else:
+                    self.children.append(Tags.Chunk(str(child)))
+
+            for child in self.children:
+                if 'reset' not in child.tags and 'uncolor' not in child.tags:
+                    child.fgcolor = child.fgcolor or fgcolor
+                    child.bgcolor = child.bgcolor or bgcolor
+
+                if tags:
+                    child.tags |= tags
+
+        def __add__(self, right):
+            return Tags.ChunkList([self, right])
+
+        def __radd__(self, left):
+            return Tags.ChunkList([left, self])
+
+        def __repr__(self):
+            return "<ChunkList(%r)>" % (self.children,)
+
+        def split_lines(self):
+            result = []
+            curr_chunklist = Tags.ChunkList()
+
+            for chunk in self.children:
+                if '\n' not in chunk.text:
+                    curr_chunklist.children.append(chunk)
+                    continue
+
+                lines = chunk.text.split('\n')
+                for i, line in enumerate(lines):
+                    newchunk = chunk.copy()
+                    newchunk.text = line
+
+                    if i > 0:
+                        newchunk.tags -= {'reset', 'uncolor'}
+                        result.append(curr_chunklist)
+                        curr_chunklist = Tags.ChunkList()
+
+                    curr_chunklist.children.append(newchunk)
+
+            result.append(curr_chunklist)
+            return result
+
+        def split_words(self):
+            new_chunklist = Tags.ChunkList()
+
+            for chunk in self.children:
+                words = chunk.text.split(' ')
+
+                for i, word in enumerate(words):
+                    newchunk = chunk.copy()
+                    newchunk.text = word + ' '
+
+                    if i == len(words) - 1:
+                        newchunk.text = newchunk.text[:-1]
+                    new_chunklist.children.append(newchunk)
+
+            return new_chunklist
+
+        def __str__(self):
+            return self.to_string(end=True)
+
+        def to_string(self, end=False):
+            fg, bg = '', ''
+            tags = set()
+            ret = ''
+
+            for chunk in self.children:
+                for tag in (tags ^ chunk.tags):
+                    ret += Tags.formats[tag]
+
+                    if tag == 'reset' or tag == 'uncolor':
+                        fg, bg = '', ''
+                        if tag == 'reset':
+                            tags = set()
+
+                if (fg, bg) != (chunk.fgcolor, chunk.bgcolor):
+                    ret += '\x03'
+
+                    if chunk.fgcolor or chunk.bgcolor:
+                        ret += Tags.colors[chunk.fgcolor]
+
+                    if chunk.bgcolor and bg != chunk.bgcolor:
+                        ret += ',' + Tags.colors[chunk.bgcolor]
+
+                if ret.endswith(Tags.formats['uncolor']) and (
+                        chunk.text[:1].isdigit() or \
+                        chunk.text[:1] == ','):
+                    ret += 2 * Tags.formats['bold'] # workaround
+
+                ret += chunk.text
+
+                fg, bg = chunk.fgcolor, chunk.bgcolor
+                tags = chunk.tags.copy() - {'reset', 'uncolor'}
+
+            if end:
+                if fg or bg:
+                    ret += Tags.formats['uncolor']
+                for tag in tags - {'uncolor', 'reset'}:
+                    ret += Tags.formats[tag]
+
+            return ret
+
+    class Chunk:
+        fgcolor = ''
+        bgcolor = ''
+        tags = None
+
+        def __init__(self, text=''):
+            self.text = text
+            self.tags = set()
+
+        def copy(self):
+            other = Tags.Chunk(self.text)
+            other.tags = self.tags.copy()
+            other.fgcolor = self.fgcolor
+            other.bgcolor = self.bgcolor
+            return other
+
+        def __repr__(self):
+            attrlist = [repr(self.text)]
+            if self.fgcolor:
+                attrlist.append('fgcolor=%r' % self.fgcolor)
+            if self.bgcolor:
+                attrlist.append('bgcolor=%r' % self.bgcolor)
+
+            attrlist.extend(self.tags)
+
+            return '<Chunk(%s)>' % (', '.join(attrlist))
 
 Tags = Tags()
 
@@ -200,10 +388,11 @@ class ServerConfig:
     '''
     def __init__(self):
         self.info = {
-        'CHANMODES': 'b,k,l,psitnm',
-        'PREFIX': '(ov)@+',
-        'MAXLIST': 'beI:10', # arbitrary
-        'MODES' : '3',
+            'CHANMODES': 'b,k,l,psitnm',
+            'CHANTYPES': '#',
+            'PREFIX': '(ov)@+',
+            'MAXLIST': 'beI:10', # arbitrary
+            'MODES' : '3',
         }
 
     def __getitem__(self, item):
@@ -214,6 +403,13 @@ class ServerConfig:
 
     def __contains__(self, item):
         return item in self.info
+
+    @property
+    def chan_prefixes(self):
+        """
+        Returns the possible channel prefixes characters
+        """
+        return set(self.info['CHANTYPES'])
 
     @property
     def chan_modes(self):
@@ -324,7 +520,7 @@ class IRC:
         self.handlers = {}
 
     def is_channel(self, text):
-        return text.startswith('#') or text.startswith('&')
+        return text[0:1] in self.serverconf.chan_prefixes
 
     def is_me(self, user):
         return irc_equals(str(user), str(self.myself))
@@ -385,15 +581,7 @@ class IRC:
 
         logger.debug('> ' + raw)
 
-    def send(self, *params, last=''):
-        """
-        Send a message to the server.
-        Arguments can not contain space, newlines or begin with a ':'
-
-        Only the "last" keywork argument can contain spaces and is prefixed
-        with a ':' character in the raw message.
-        """
-
+    def _get_prefix(self, params):
         prefix = ''
 
         for prm in params:
@@ -411,87 +599,99 @@ class IRC:
             prefix += prm + ' '
 
         prefix = prefix[:-1] # remove trailing space
+        return prefix
 
-        if '\n' in last or '\r' in last:
-            raise ValueError("newlines not allowed in last argument")
+    def send(self, *params, last=''):
+        """
+        Send a single-line message to the server.
+
+        Only the "last" keywork argument can contain spaces and is prefixed
+        with a ':' character in the raw message. Newlines will be replaced with
+        a space.
+
+        Other arguments can not contain space, newlines or begin with a ':'
+        Every argument will be converted into a string using str()
+        """
+
+        prefix = self._get_prefix(params)
+
+        if isinstance(last, Tags.ChunkList):
+            last = last.to_string()
+        else:
+            last = str(last)
+
+        last = ' '.join(x.strip('\r') for x in last.split('\n'))
 
         if last:
             self.raw(prefix + ' :' + last)
         else:
             self.raw(prefix)
 
-    def send_multi(self, *params, last='', no_break=False, no_format=False):
+    def send_multi(self, *params, last='', no_break=False):
         """
         Send a command multiple times to the server.
         For each newline in the last argument, the command will be repeated.
 
-        If the last argument is too long, it will be split into multiple lines
-        unless the no_break argument is set.
+        The 'last' argument will be parsed for format codes and will be split
+        into words to allow intelligent line breaking of too long line.
+        Whenever possible, the line breaking algorithm will cut at a chunk
+        boundary (at the end of a word or before a formatting tag)
 
-        The effective formatting at the end of each line will be repeated on the
-        beginning of the next line unless the no_format argument is set.
+        This behaviour can be disabled by passing the no_break=True argument.
+        Keep in mind that by doing so, lines that are too long will be
+        truncated by the IRC server.
+
+        Every other argument will be converted into a string using str()
         """
 
-        if last:
-            fgcolor = ''
-            bgcolor = ''
-            format = []
+        prefix = self._get_prefix(params)
 
-            for unwrapped_line in last.split('\n'):
-                if not unwrapped_line.strip(): # get rid of empty lines
-                    continue
+        if no_break:
+            if isinstance(last, Formats.ChunkList):
+                last = last.to_string()
+            else:
+                last = str(last)
 
-                if no_break:
-                    wraps = [unwrapped_line]
-                else:
-                    wraps = wrap(unwrapped_line, 460 - len(' '.join(params)))
+            for line in last.split('\n'):
+                self.raw(prefix + ' :' + line)
+            return
 
-                for wrapped_line in wraps:
-                    # add the formatting to the beginning of the line
-                    line = ''.join(format)
+        # FIXME: might be too small if you have a long nickname
+        max_limit = 450 - len(prefix) # forced break at this limit
 
-                    if fgcolor or bgcolor:
-                        line += '\x03' + fgcolor
+        if not isinstance(last, Tags.ChunkList):
+            last = Tags.parse(str(last))
 
-                        if bgcolor:
-                            line += ',' + bgcolor
+        last = last.split_words()
 
-                    # now add the text itself
-                    line += wrapped_line
+        for line in last.split_lines():
+            next_chunks = line.children[:]
 
-                    self.send(*params, last=line.replace('\r',''))
+            while next_chunks:
+                nb_chunks = len(next_chunks)
 
-                    if no_format:
-                        continue
+                # try to fit the maximum number of complete chunks
+                for complete_chunks in range(nb_chunks, 0, -1):
+                    left_chunks = Tags.ChunkList(next_chunks[:complete_chunks])
+                    length = len(str(left_chunks))
 
-                    i = 0
-                    while i < len(line):
-                        char = line[i]
-                        i += 1
+                    if length <= max_limit: # it fits!
+                        break
 
-                        if char == Tags.Reset:
-                            fgcolor = bgcolor = ''
-                            format = []
-                        elif char in Tags.tags.values():
-                            if char in format:
-                                format.remove(char)
-                            else:
-                                format.append(char)
-                        elif char == '\x03':
-                            match = Tags.RE_COLOR.match(line[i-1:])
+                if length > max_limit:
+                    # looks like we'll need to break the first chunk
+                    chunk = next_chunks[0]
+                    to_chop = length - max_limit
+                    half1 = chunk.copy()
+                    half2 = chunk.copy()
+                    half1.text = chunk.text[:-to_chop]
+                    half2.text = chunk.text[-to_chop:]
+                    next_chunks[0] = half1
+                    next_chunks.insert(1, half2)
 
-                            if not match.group(1): # uncolor
-                                fgcolor = bgcolor = ''
-                            else:
-                                if match.group(1):
-                                    fgcolor = match.group(1)
-
-                                if match.group(2):
-                                    bgcolor = match.group(2)
-
-                                i += match.end() - 1
-        else:
-            self.send(*params)
+                chunklist = Tags.ChunkList(next_chunks[:complete_chunks])
+                self.raw(prefix + ' :' + chunklist.to_string())
+                next_chunks = next_chunks[complete_chunks:]
 
     def ident(self, nick, ident = None,
             realname=__version__, password = None):
