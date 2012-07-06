@@ -28,7 +28,7 @@ import sys
 class ModuleNotFound(Exception): pass
 
 class TestBot(IRC):
-    admins = ('jerrycraft.tk')
+    admins = ('jerrycraft.tk',)
 
     def on_ready(self):
         self.join('#pypeul')
