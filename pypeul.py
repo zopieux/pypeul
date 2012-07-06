@@ -528,6 +528,7 @@ class IRC:
         self.myself = None
         self.serverconf = ServerConfig()
         self.handlers = {}
+        self.send_lock = threading.RLock()
 
     def is_channel(self, text):
         return text[0:1] in self.serverconf.chan_prefixes
@@ -585,11 +586,15 @@ class IRC:
         return thread
 
     def raw(self, raw):
-        '''Send a raw message to server'''
-        # TODO make this thread-safe
-        self.sk.send(raw.encode(ENCODING) + b'\r\n')
+        '''
+        Send a raw string to server
 
-        logger.debug('> ' + raw)
+        This method is thread-safe
+        '''
+        with self.send_lock:
+            self.sk.send(raw.encode(ENCODING) + b'\r\n')
+
+            logger.debug('> ' + raw)
 
     def _get_prefix(self, params):
         prefix = ''
@@ -652,6 +657,8 @@ class IRC:
         truncated by the IRC server.
 
         Every other argument will be converted into a string using str()
+
+        This method is thread-safe
         """
 
         prefix = self._get_prefix(params)
@@ -662,8 +669,9 @@ class IRC:
             else:
                 last = str(last)
 
-            for line in last.split('\n'):
-                self.raw(prefix + ' :' + line)
+            with self.send_lock:
+                for line in last.split('\n'):
+                    self.raw(prefix + ' :' + line)
             return
 
         # FIXME: might be too small if you have a long nickname
@@ -673,6 +681,7 @@ class IRC:
             last = Tags.parse(str(last))
 
         last = last.split_words()
+        lines = []
 
         for line in last.split_lines():
             next_chunks = line.children[:]
@@ -700,8 +709,12 @@ class IRC:
                     next_chunks.insert(1, half2)
 
                 chunklist = Tags.ChunkList(next_chunks[:complete_chunks])
-                self.raw(prefix + ' :' + chunklist.to_string())
+                lines.append(chunklist.to_string())
                 next_chunks = next_chunks[complete_chunks:]
+
+        with self.send_lock:
+            for line in lines:
+                self.raw(prefix + ' :' + line)
 
     def ident(self, nick, ident = None,
             realname=__version__, password = None):
