@@ -539,7 +539,7 @@ class IRC:
     def users_in(self, channel):
         return [u for u in self.users.values() if u.is_in(channel)]
 
-    def connect(self, host, port = 6667, use_ssl=False):
+    def connect(self, host, port=6667, use_ssl=False):
         '''Etablish a connection to a server'''
         logger.info('Connecting to %s port %d ...', host, port)
 
@@ -716,8 +716,8 @@ class IRC:
             for line in lines:
                 self.raw(prefix + ' :' + line)
 
-    def ident(self, nick, ident = None,
-            realname=__version__, password = None):
+    def ident(self, nick, ident=None,
+            realname=__version__, password=None):
         '''Identify with nick, password and real name.
         must be called after connect()'''
 
@@ -884,7 +884,7 @@ class IRC:
             logger.debug('calling %s() on instance %r' % (name, inst))
 
             if self.thread_callbacks or getattr(f, 'threaded', None):
-                t = threading.Thread(target = f, args = parameters)
+                t = threading.Thread(target=f, args=parameters)
                 t.daemon = True
                 t.start()
             else:
