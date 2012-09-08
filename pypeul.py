@@ -575,7 +575,7 @@ class IRC:
         self.connected = False
 
         logger.info('Disconnected')
-        self._callback('on_disconnnected')
+        self._callback('on_disconnected')
         self.enabled = False
 
     def run_threaded(self):
