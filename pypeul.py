@@ -530,6 +530,9 @@ class IRC:
         self.handlers = {}
         self.send_lock = threading.RLock()
 
+        self.fsock = None
+        self.waiting_queue = []
+
     def is_channel(self, text):
         return text[0:1] in self.serverconf.chan_prefixes
 
@@ -550,30 +553,45 @@ class IRC:
             self.sk = ssl.wrap_socket(self.sk)
 
         self.sk.connect((host, port))
-
+        self.fsock = self.sk.makefile('rb')
+        
         logger.info('Connected successfully')
         self.connected = True
         self._callback('on_connected')
 
-    def run(self):
-        file = self.sk.makefile('rb')
-
-        while self.enabled:
+    def get_raw_message(self):
             try:
-                txt = file.readline()
+                txt = self.fsock.readline()
             except IOError:
-                break
-
+                return None
             if txt == b'':
-                break
+                return None
+            return txt
 
+    def run_loop(self):
+        while self.enabled:
+            for waiting_msg in self.waiting_queue:
+                if waiting_msg == None:
+                    return
+                try:
+                    self._process_message(waiting_msg)
+                except:
+                    logger.exception("Exception raised while processing a message")
+           
+            self.waiting_queue = []
+            
+            txt = self.get_raw_message()
+            if txt == None:
+                break
             try:
-                self._process_message(txt.strip(b'\r\n'))
+                self._process_message(txt)
             except:
                 logger.exception("Exception raised while processing a message")
 
+    def run(self):
+        self.run_loop()
+        
         self.connected = False
-
         logger.info('Disconnected')
         self._callback('on_disconnected')
         self.enabled = False
@@ -890,7 +908,8 @@ class IRC:
             else:
                 f(*parameters)
 
-    def _process_message(self, text):
+    def _parse_message(self, text):
+        text = text.strip(b'\r\n')
         text = list(map(self.to_unicode, text.split(b' ')))
         logger.debug('< ' + ' '.join(text))
 
@@ -929,6 +948,10 @@ class IRC:
                 params.append(prm)
 
         cmd = numeric_events.get(cmd, cmd.upper())
+        return umask, cmd, params
+    
+    def _process_message(self, text):
+        umask, cmd, params = self._parse_message(text)
 
         if cmd in ('JOIN', 'PART', 'KICK'):
             self._callback('on_pre_server_' + cmd.lower(), umask, *params)
