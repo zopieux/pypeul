@@ -6,7 +6,7 @@
 
 # This file is part of pypeul.
 #
-# Copyright (c) 2010-2012 Mick@el and Zopieux
+# Copyright (c) 2010-2012 Mick@el, Zopieux and seirl
 #
 # pypeul is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as
@@ -840,6 +840,28 @@ class IRC:
     def retrieve_ban_list(self, chan):
         self.bans[chan] = []
         self.send('MODE', chan, '+b')
+
+    def get_list(self, target, getcmd, listname):
+        l = []
+        self.send(*getcmd)
+        while True:
+            txt = self.get_raw_message()
+            if txt == None:
+                self.waiting_queue.append(txt)
+                return
+            umask, cmd, params = self._parse_message(txt)
+            if cmd == listname and params[1] == target:
+                l.append(params[2:])
+            elif cmd == 'endof' + listname and target == params[1]:
+                break
+            else:
+                self.waiting_queue.append(txt)
+        return l
+                
+    def get_banlist(self, chan):
+        banlist = self.get_list(chan, ('MODE', chan, '+b'), 'banlist')
+        self.bans[chan] = banlist
+        return banlist
 
     def ctcp_request(self, to, type, value=''):
         type = str(type)
