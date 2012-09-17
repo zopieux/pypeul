@@ -33,6 +33,7 @@ import io
 import logging
 from collections import namedtuple, Callable, UserDict, OrderedDict
 from textwrap import wrap
+import time
 
 # Decorator used to specify that a callbacks needs to be run in a thread
 def threaded(func):
@@ -841,14 +842,22 @@ class IRC:
         self.bans[chan] = []
         self.send('MODE', chan, '+b')
 
-    def get_list(self, target, getcmd, listname):
+    def get_list(self, target, getcmd, listname, timeout=0):
+        '''
+        Synchronously retrieves a list of items and returns it.
+        If the timeout is set, this function won't wait for the endoflist
+        signal and will return the list retrieved so far.
+        '''
         l = []
         self.send(*getcmd)
+        start_time = time.time()
         while True:
+            if timeout != 0 and time.time() > start_time + timeout:
+                break
             txt = self.get_raw_message()
             if txt == None:
                 self.waiting_queue.append(txt)
-                return
+                break
             umask, cmd, params = self._parse_message(txt)
             if cmd == listname and params[1] == target:
                 l.append(params[2:])
@@ -858,8 +867,10 @@ class IRC:
                 self.waiting_queue.append(txt)
         return l
                 
-    def get_banlist(self, chan):
-        banlist = self.get_list(chan, ('MODE', chan, '+b'), 'banlist')
+    def get_banlist(self, chan, timeout=0):
+        banlist = self.get_list(chan, ('MODE', chan, '+b'), 'banlist', timeout=timeout)
+        if not chan in self.bans:
+            self.bans[chan] = []
         self.bans[chan] = banlist
         return banlist
 
