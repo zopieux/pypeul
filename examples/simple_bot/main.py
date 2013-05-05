@@ -22,7 +22,7 @@
 # License along with pypeul. If not, see <http://www.gnu.org/licenses/>.
 
 from pypeul import *
-import sys
+import time
 
 class SimpleBot(IRC):
     def on_ready(self):
@@ -60,6 +60,18 @@ class SimpleBot(IRC):
         """
         self.ctcp_reply(umask.nick, 'VERSION', "SimpleBot, powered by pypeul")
 
+    def on_disconnected(self):
+        logger.info('Disconnected. Trying to reconnect...')
+        while True:
+            try:
+                self.connect('irc.freenode.net', 6667)
+                self.ident('SimpleBot')
+                self.run()
+                break
+            except:
+                logger.error('Attempt failed. Retrying in 30s...')
+            time.sleep(30)
+
 
 if __name__ == '__main__':
     # Enable debug-level logging
@@ -68,6 +80,6 @@ if __name__ == '__main__':
 
     # Instanciate our SimpleBot class and let it run
     bot = SimpleBot()
-    bot.connect('irc.epiknet.net', 6664)
+    bot.connect('irc.freenode.net', 6667)
     bot.ident('SimpleBot')
     bot.run()

@@ -46,7 +46,7 @@ def threaded(func):
 logger = logging.getLogger(__name__)
 
 def irc_lower(s):
-	# TODO: better implementation
+    # TODO: better implementation
     return s.encode('utf-8').lower().decode('utf-8')
 
 def irc_equals(s1, s2):
@@ -554,10 +554,12 @@ class IRC:
             self.sk = ssl.wrap_socket(self.sk)
 
         self.sk.connect((host, port))
+        self.sk.settimeout(512)
         self.fsock = self.sk.makefile('rb')
         
         logger.info('Connected successfully')
         self.connected = True
+        self.enabled = True
         self._callback('on_connected')
 
     def get_raw_message(self):
@@ -593,9 +595,9 @@ class IRC:
         self.run_loop()
         
         self.connected = False
+        self.enabled = False
         logger.info('Disconnected')
         self._callback('on_disconnected')
-        self.enabled = False
 
     def run_threaded(self):
         thread = threading.Thread(target=self.run)
