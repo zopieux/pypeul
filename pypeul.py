@@ -35,22 +35,27 @@ from collections import namedtuple, Callable, UserDict, OrderedDict
 from textwrap import wrap
 import time
 
+
 # Decorator used to specify that a callbacks needs to be run in a thread
 def threaded(func):
     if not func.__name__.lower().startswith('on_'):
-        raise TypeError("threaded decorator can only be used on callback functions")
+        raise TypeError(
+                "threaded decorator can only be used on callback functions")
 
     func.threaded = True
     return func
 
 logger = logging.getLogger(__name__)
 
+
 def irc_lower(s):
     # TODO: better implementation
     return s.encode('utf-8').lower().decode('utf-8')
 
+
 def irc_equals(s1, s2):
     return irc_lower(s1) == irc_lower(s2)
+
 
 class Tags:
     '''
@@ -65,54 +70,57 @@ class Tags:
     ChunkList([<Chunk('foo', fgcolor='red', bold)>, <Chunk('bar')>])
 
     >>> Tags.UnderlineRed("This is " + Tags.BoldBlue("SPARTAAAAA!!!"))
-    ChunkList([<Chunk('This is ', fgcolor='red', underline)>, <Chunk('SPARTAAAAA!!!', fgcolor='blue', bold, underline)>])
+    ChunkList([<Chunk('This is ', fgcolor='red', underline)>,
+        <Chunk('SPARTAAAAA!!!', fgcolor='blue', bold, underline)>])
 
     >>> Tags.BoldYellowBlue("This text is yellow on a blue background")
-    ChunkList([<Chunk('This text is yellow on a blue background', fgcolor='yellow', bgcolor='blue', bold)>])
+    ChunkList([<Chunk('This text is yellow on a blue background',
+        fgcolor='yellow', bgcolor='blue', bold)>])
 
-    The first and second color names are respectively foreground and background colors.
-    Other tags may be put in any other place.
-    The keywords are case-insensitive (Tags.boldred("hello") works as well)
+    The first and second color names are respectively foreground and background
+    colors.  Other tags may be put in any other place.  The keywords are
+    case-insensitive (Tags.boldred("hello") works as well)
 
-    The result is a ChunkList object that will be automatically converted when sent over IRC.
-    str() can also be used to force the conversion
+    The result is a ChunkList object that will be automatically converted when
+    sent over IRC.  str() can also be used to force the conversion
 
     The following tags are defined : Bold, Underline, Reverse, Reset
 
     Some notes about nested tags :
-        - child tag will inherit the parent's background color, unless it has Reset or Uncolor attribute (or another background color)
-        - child tag always has priority over the parent : Tags.Red(Tags.Blue("...")) will be blue
-    '''
+        - child tag will inherit the parent's background color, unless it has
+          Reset or Uncolor attribute (or another background color)
+        - child tag always has priority over the parent :
+            Tags.Red(Tags.Blue("...")) will be blue '''
 
     RE_COLOR = re.compile(r'\x03(\d{1,2})?(?:,(\d{1,2})?)?')
     colors = {
-        'white' : '00',
-        'black' : '01',
-        'blue' : '02',
+        'white': '00',
+        'black': '01',
+        'blue': '02',
         'green': '03',
         'red': '04',
-        'brown' : '05',
-        'purple' : '06',
-        'orange' : '07',
-        'yellow' : '08',
-        'ltgreen' : '09',
-        'teal' : '10',
-        'cyan' : '11',
-        'ltblue' : '12',
-        'pink' : '13',
-        'grey' : '14',
-        'ltgrey' : '15'
+        'brown': '05',
+        'purple': '06',
+        'orange': '07',
+        'yellow': '08',
+        'ltgreen': '09',
+        'teal': '10',
+        'cyan': '11',
+        'ltblue': '12',
+        'pink': '13',
+        'grey': '14',
+        'ltgrey': '15'
     }
 
     color_names = list(colors.keys())
     color_codes = [int(x) for x in colors.values()]
 
     formats = {
-        'reset' : '\x0f',
-        'uncolor' : '\x03',
-        'bold' : '\x02',
-        'underline' : '\x1f',
-        'reverse' : '\x16'
+        'reset': '\x0f',
+        'uncolor': '\x03',
+        'bold': '\x02',
+        'underline': '\x1f',
+        'reverse': '\x16'
     }
 
     formats_names = list(formats.keys())
@@ -226,7 +234,8 @@ class Tags:
                     raise AttributeError("You can't have more than 2 colors !")
             elif keyword in self.formats:
                 if keyword in formats:
-                    raise AttributeError("You specified the same format twice !")
+                    raise AttributeError(
+                            "You specified the same format twice !")
                 else:
                     formats.add(keyword)
             else:
@@ -237,7 +246,8 @@ class Tags:
                 return Tags.ChunkList([value], fgcolor, bgcolor, formats)
 
             def __str__(self):
-                return Tags.ChunkList([''], fgcolor, bgcolor, formats).to_string()
+                return Tags.ChunkList(
+                        [''], fgcolor, bgcolor, formats).to_string()
 
             def __add__(self, other):
                 return str(self) + str(other)
@@ -345,9 +355,9 @@ class Tags:
                         ret += ',' + Tags.colors[chunk.bgcolor]
 
                 if ret.endswith(Tags.formats['uncolor']) and (
-                        chunk.text[:1].isdigit() or \
+                        chunk.text[:1].isdigit() or
                         chunk.text[:1] == ','):
-                    ret += 2 * Tags.formats['bold'] # workaround
+                    ret += 2 * Tags.formats['bold']  # workaround
 
                 ret += chunk.text
 
@@ -391,6 +401,7 @@ class Tags:
 
 Tags = Tags()
 
+
 class ServerConfig:
     '''
     This classed is used to allow easy access to the RPL_ISUPPORT line returned
@@ -402,8 +413,8 @@ class ServerConfig:
             'CHANMODES': 'b,k,l,psitnm',
             'CHANTYPES': '#',
             'PREFIX': '(ov)@+',
-            'MAXLIST': 'beI:10', # arbitrary
-            'MODES' : '3',
+            'MAXLIST': 'beI:10',  # arbitrary
+            'MODES': '3',
         }
 
     def __getitem__(self, item):
@@ -432,7 +443,8 @@ class ServerConfig:
         C = Mode that changes a setting and only has a parameter when set.
         D = Mode that changes a setting and never has a parameter.
 
-        Note: Modes of type A return the list when there is no parameter present.
+        Note: Modes of type A return the list when there is no parameter
+              present.
         Note: Some clients assumes that any mode not listed is of type D.
         Note: Modes in PREFIX are not listed but could be considered type B.
         '''
@@ -518,6 +530,7 @@ class ServerConfig:
         '''
         return set(self.chan_modes[3])
 
+
 class IRC:
     def __init__(self, thread_callbacks=False):
         self.thread_callbacks = thread_callbacks
@@ -556,7 +569,7 @@ class IRC:
         self.sk.connect((host, port))
         self.sk.settimeout(512)
         self.fsock = self.sk.makefile('rb')
-        
+
         logger.info('Connected successfully')
         self.connected = True
         self.enabled = True
@@ -574,17 +587,18 @@ class IRC:
     def run_loop(self):
         while self.enabled:
             for waiting_msg in self.waiting_queue:
-                if waiting_msg == None:
+                if waiting_msg is None:
                     return
                 try:
                     self._process_message(waiting_msg)
                 except:
-                    logger.exception("Exception raised while processing a message")
-           
+                    logger.exception(
+                            "Exception raised while processing a message")
+
             self.waiting_queue = []
-            
+
             txt = self.get_raw_message()
-            if txt == None:
+            if txt is None:
                 break
             try:
                 self._process_message(txt)
@@ -593,7 +607,6 @@ class IRC:
 
     def run(self):
         self.run_loop()
-        
         self.connected = False
         self.enabled = False
         logger.info('Disconnected')
@@ -634,7 +647,7 @@ class IRC:
 
             prefix += prm + ' '
 
-        prefix = prefix[:-1] # remove trailing space
+        prefix = prefix[:-1]  # remove trailing space
         return prefix
 
     def send(self, *params, last=''):
@@ -696,7 +709,7 @@ class IRC:
             return
 
         # FIXME: might be too small if you have a long nickname
-        max_limit = 450 - len(prefix) # forced break at this limit
+        max_limit = 450 - len(prefix)  # forced break at this limit
 
         if not isinstance(last, Tags.ChunkList):
             last = Tags.parse(str(last))
@@ -715,7 +728,7 @@ class IRC:
                     left_chunks = Tags.ChunkList(next_chunks[:complete_chunks])
                     length = len(str(left_chunks))
 
-                    if length <= max_limit: # it fits!
+                    if length <= max_limit:  # it fits!
                         break
 
                 if length > max_limit:
@@ -857,7 +870,7 @@ class IRC:
             if timeout != 0 and time.time() > start_time + timeout:
                 break
             txt = self.get_raw_message()
-            if txt == None:
+            if txt is None:
                 self.waiting_queue.append(txt)
                 break
             umask, cmd, params = self._parse_message(txt)
@@ -868,9 +881,10 @@ class IRC:
             else:
                 self.waiting_queue.append(txt)
         return l
-                
+
     def get_banlist(self, chan, timeout=0):
-        banlist = self.get_list(chan, ('MODE', chan, '+b'), 'banlist', timeout=timeout)
+        banlist = self.get_list(chan, ('MODE', chan, '+b'), 'banlist',
+                timeout=timeout)
         if not chan in self.bans:
             self.bans[chan] = []
         self.bans[chan] = banlist
@@ -916,7 +930,8 @@ class IRC:
             if last is None:
                 raise ValueError("Modes have to begin with + or -")
 
-            param_modes = self.serverconf.param_modes | self.serverconf.list_modes
+            param_modes = (self.serverconf.param_modes |
+                           self.serverconf.list_modes)
             if last == '+':
                 param_modes |= self.serverconf.param_set_modes
 
@@ -952,23 +967,23 @@ class IRC:
 
         umask = None
 
-        if text[0].startswith(':'): # Prefix parsing
+        if text[0].startswith(':'):  # Prefix parsing
             prefix = text[0][1:]
-            text   = text[1:]
+            text = text[1:]
 
             umask = UserMask(self, prefix)
 
         if len(text) > 1:
-            cmd  = text[0]
+            cmd = text[0]
             prms = text[1:]
         else:
-            cmd  = text[0]
+            cmd = text[0]
             prms = []
 
         # Parameters parsing
 
         params = []
-        last   = False
+        last = False
 
         for prm in prms:
             if prm.startswith(':') and not last:
@@ -984,7 +999,7 @@ class IRC:
 
         cmd = numeric_events.get(cmd, cmd.upper())
         return umask, cmd, params
-    
+
     def _process_message(self, text):
         umask, cmd, params = self._parse_message(text)
 
@@ -1014,7 +1029,7 @@ class IRC:
         elif cmd == 'welcome':
             self._callback('on_ready')
 
-        elif cmd == 'featurelist': # Server configuration string
+        elif cmd == 'featurelist':  # Server configuration string
             for i, param in enumerate(params[1:]):
                 if i == len(params):
                     break
@@ -1066,7 +1081,8 @@ class IRC:
                     self._callback('on_action', umask, params[0], value)
                 else:
                     self._callback('on_ctcp_request', umask, name, value)
-                    self._callback('on_ctcp_' + name.lower() + '_request', umask, value)
+                    self._callback('on_ctcp_' + name.lower() + '_request',
+                            umask, value)
             else:
                 self._callback('on_message', umask, *params)
 
@@ -1086,7 +1102,8 @@ class IRC:
                     name, value = name[:pos], name[pos + 1:]
 
                 self._callback('on_ctcp_reply', umask, name, value)
-                self._callback('on_ctcp_'+ name.lower() + '_reply', umask, value)
+                self._callback('on_ctcp_' + name.lower() + '_reply', umask,
+                        value)
             else:
                 self._callback('on_notice', umask, *params)
 
@@ -1096,14 +1113,15 @@ class IRC:
                 elif self.is_me(params[0]):
                     self._callback('on_private_notice', umask, params[1])
 
-        elif cmd == 'MODE' and umask and len(params) > 2 and self.is_channel(params[0]):
+        elif (cmd == 'MODE' and umask and len(params) > 2 and
+             self.is_channel(params[0])):
             chan = params[0]
             modestr = params[1]
             targets = params[2:]
 
             for add, mode, value in self.parse_modes(modestr, targets):
-                if mode in (self.serverconf.prefixes_modes \
-                            | self.serverconf.list_modes \
+                if mode in (self.serverconf.prefixes_modes
+                            | self.serverconf.list_modes
                             - set(self.serverconf.max_lists_entries)):
                     user = UserMask(self, value).user
                     mode_set = user.modes_in(chan)
@@ -1139,7 +1157,7 @@ class UserMask:
             self.user = self.irc.users[self.nick]
 
             if self.host and self.host != self.user.host:
-                self.user.host = self.host # host can change (mode x)
+                self.user.host = self.host  # host can change (mode x)
             if self.ident and not self.user.ident:
                 self.user.ident = self.ident
         else:
@@ -1147,10 +1165,12 @@ class UserMask:
             self.irc.users[self.nick] = self.user
 
     def __repr__(self):
-        return '<UserMask: {0}!{1}@{2}>'.format(self.nick, self.ident, self.host)
+        return '<UserMask: {0}!{1}@{2}>'.format(self.nick, self.ident,
+                self.host)
 
     def __str__(self):
         return self.nick
+
 
 class User:
     def __init__(self, mask):
@@ -1162,7 +1182,8 @@ class User:
         self.deleted = False
 
         if self.nick in self.irc.users:
-            logger.error("Tried instanciating multiple User instances for the same user.")
+            logger.error("Tried instanciating multiple User instances for the
+                    same user.")
 
     def is_in(self, channel):
         return channel in self.channels
@@ -1201,16 +1222,17 @@ class User:
         del self.irc.users[self.nick]
 
     def __repr__(self):
-        return '<{0}User: {1}!{2}@{3}>'.format('Deleted ' if self.deleted else '',
-            self.nick, self.ident, self.host)
+        return '<{0}User: {1}!{2}@{3}>'.format('Deleted ' if self.deleted else
+                '', self.nick, self.ident, self.host)
 
     def __str__(self):
         return self.nick
 
+
 class NormalizedDict(UserDict):
     function = staticmethod(str.lower)
 
-    def __init__(self, *args,  **kwargs):
+    def __init__(self, *args, **kwargs):
         self._map = {}
         super(NormalizedDict, self).__init__(*args, **kwargs)
 
@@ -1236,8 +1258,10 @@ class NormalizedDict(UserDict):
         del self[oldkey]
         self[newkey] = val
 
+
 class IrcDict(NormalizedDict):
     function = staticmethod(irc_lower)
+
 
 numeric_events = {
     "001": "welcome",
@@ -1363,10 +1387,10 @@ numeric_events = {
     "423": "noadmininfo",
     "424": "fileerror",
     "431": "nonicknamegiven",
-    "432": "erroneusnickname", # Thiss iz how its speld in thee RFC.
+    "432": "erroneusnickname",  # Thiss iz how its speld in thee RFC.
     "433": "nicknameinuse",
     "436": "nickcollision",
-    "437": "unavailresource",  # "Nick temporally unavailable"
+    "437": "unavailresource",   # "Nick temporally unavailable"
     "441": "usernotinchannel",
     "442": "notonchannel",
     "443": "useronchannel",
@@ -1378,7 +1402,7 @@ numeric_events = {
     "462": "alreadyregistered",
     "463": "nopermforhost",
     "464": "passwdmismatch",
-    "465": "yourebannedcreep", # I love this one...
+    "465": "yourebannedcreep",  # I love this one...
     "466": "youwillbebanned",
     "467": "keyset",
     "471": "channelisfull",
