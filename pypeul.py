@@ -1182,8 +1182,8 @@ class User:
         self.deleted = False
 
         if self.nick in self.irc.users:
-            logger.error("Tried instanciating multiple User instances for the
-                    same user.")
+            logger.error('''Tried instanciating multiple User instances for the
+                    same user.''')
 
     def is_in(self, channel):
         return channel in self.channels
