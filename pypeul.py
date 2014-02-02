@@ -621,10 +621,10 @@ class IRC:
             while True:
                 if callable(self.reconnect_obj):
                     t = self.reconnect_obj(i)
-                elif isinstance(self.reconnect_obj, int):
+                elif isinstance(self.reconnect_obj, (int, float)):
                     t = self.reconnect_obj
                 else:
-                    raise TypeError("set_reconnect: not an int nor a callable")
+                    raise TypeError("reconnect: not a number nor a callable")
 
                 logger.info('Trying to reconnect in {}s.'.format(t))
                 time.sleep(t)
@@ -835,7 +835,7 @@ class IRC:
         self.send('QUIT', last=reason)
 
     def set_reconnect(self, obj):
-        '''If 'obj' is an int, the bot will try to reconnect every 'obj'
+        '''If 'obj' is a number, the bot will try to reconnect every 'obj'
         seconds after its disconnection.
         If 'obj' is a callable, it will be called at each disconnection with
         the number of reconnections attempts since the beginning.
