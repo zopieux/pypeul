@@ -60,18 +60,6 @@ class SimpleBot(IRC):
         """
         self.ctcp_reply(umask.nick, 'VERSION', "SimpleBot, powered by pypeul")
 
-    def on_disconnected(self):
-        logger.info('Disconnected. Trying to reconnect...')
-        while True:
-            try:
-                self.connect('irc.freenode.net', 6667)
-                self.ident('SimpleBot')
-                self.run()
-                break
-            except:
-                logger.error('Attempt failed. Retrying in 30s...')
-            time.sleep(30)
-
 
 if __name__ == '__main__':
     # Enable debug-level logging
@@ -82,4 +70,5 @@ if __name__ == '__main__':
     bot = SimpleBot()
     bot.connect('irc.freenode.net', 6667)
     bot.ident('SimpleBot')
+    bot.set_reconnect(lambda x: x * 30)
     bot.run()

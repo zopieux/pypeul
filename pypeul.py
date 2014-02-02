@@ -547,6 +547,8 @@ class IRC:
         self.fsock = None
         self.waiting_queue = []
 
+        self.reconnect_obj = None
+
     def is_channel(self, text):
         return text[0:1] in self.serverconf.chan_prefixes
 
@@ -560,6 +562,8 @@ class IRC:
         '''Etablish a connection to a server'''
         logger.info('Connecting to %s port %d ...', host, port)
 
+        self.host = host
+        self.port = port
         self.sk = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         if use_ssl:
@@ -609,8 +613,32 @@ class IRC:
         self.run_loop()
         self.connected = False
         self.enabled = False
-        logger.info('Disconnected')
+        logger.info('Disconnected from server.')
         self._callback('on_disconnected')
+
+        if self.reconnect_obj:
+            i = 0
+            while True:
+                if callable(self.reconnect_obj):
+                    t = self.reconnect_obj(i)
+                elif isinstance(self.reconnect_obj, int):
+                    t = self.reconnect_obj
+                else:
+                    raise TypeError("set_reconnect: not an int nor a callable")
+
+                logger.info('Trying to reconnect in {}s.'.format(t))
+                time.sleep(t)
+                i += 1
+
+                try:
+                    self.connect(self.host, self.port)
+                    self.ident(self.myself.nick, self.myself.ident,
+                               self.myself.realname, self.myself.password)
+                    break
+                except Exception as e:
+                    logger.error('Reconnect failed: {}.'.format(e))
+
+            self.run()
 
     def run_threaded(self):
         thread = threading.Thread(target=self.run)
@@ -760,6 +788,8 @@ class IRC:
 
         self.myself = UserMask(self, nick).user
         self.myself.ident = ident
+        self.myself.realname = realname
+        self.myself.password = password
 
         self.nick(nick)
         self.send('USER', ident, nick, nick, last=realname)
@@ -803,6 +833,29 @@ class IRC:
 
     def quit(self, reason=''):
         self.send('QUIT', last=reason)
+
+    def set_reconnect(self, obj):
+        '''If 'obj' is an int, the bot will try to reconnect every 'obj'
+        seconds after its disconnection.
+        If 'obj' is a callable, it will be called at each disconnection with
+        the number of reconnections attempts since the beginning.
+
+        Examples:
+
+        bot.set_reconnect(15)
+        # Trying to reconnect in 15s...
+        # Trying to reconnect in 15s...
+        # Trying to reconnect in 15s...
+        # Trying to reconnect in 15s...
+
+        bot.set_reconnect(lambda x: max(30 * (2 ** x), 1800))
+        # Trying to reconnect in 30s...
+        # Trying to reconnect in 60s...
+        # Trying to reconnect in 120s...
+        # Trying to reconnect in 240s...
+        '''
+
+        self.reconnect_obj = obj
 
     def set_modes(self, target, *modes):
         """usage: set_modes('#foo', ('-o', 'Foo2'), ('+l', '30'), '-k')"""
