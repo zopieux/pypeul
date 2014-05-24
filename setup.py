@@ -18,7 +18,7 @@ from distutils.core import setup
 
 setup(
     name = 'Pypeul',
-    version = '0.3',
+    version = '0.3.1',
     url = 'http://bitbucket.org/Zopieux/pypeul/',
     license = 'LGPL',
     author = 'mickael9; Zopieux',
