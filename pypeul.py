@@ -791,11 +791,11 @@ class IRC:
         self.myself.realname = realname
         self.myself.password = password
 
-        self.nick(nick)
-        self.send('USER', ident, nick, nick, last=realname)
-
         if password:
             self.send('PASS', password)
+
+        self.nick(nick)
+        self.send('USER', ident, nick, nick, last=realname)
 
     def nick(self, nick):
         self.send('NICK', nick)
