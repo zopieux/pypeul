@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "pypeul"
+version = "0.3.1"
+description = "A Python 3 IRC library thought for the programmer."
+authors = ["mickael9 <mickael9@gmail.com>", "zopieux <zopieux@gmail.com>"]
+license = "LGPL-3.0-or-later"
+readme = "README.md"
+repository = "https://github.com/zopieux/pypeul"
+keywords = ["irc"]
+
+[tool.poetry.dependencies]
+python = "^3.7"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
