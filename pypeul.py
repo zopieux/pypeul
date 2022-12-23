@@ -21,7 +21,7 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with pypeul. If not, see <http://www.gnu.org/licenses/>.
 
-__version__ = 'Pypeul python IRC client library v0.3.1 by Mick@el & Zopieux'
+__version__ = 'Pypeul python IRC client library v0.3.2 by Mick@el & Zopieux'
 
 ENCODING = 'utf-8'
 
