@@ -31,7 +31,8 @@ import re
 import sys
 import io
 import logging
-from collections import namedtuple, Callable, UserDict, OrderedDict
+from collections import namedtuple, UserDict, OrderedDict
+from collections.abc import Callable
 from textwrap import wrap
 import time
 
