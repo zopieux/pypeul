@@ -19,7 +19,7 @@ from distutils.core import setup
 setup(
     name = 'Pypeul',
     version = '0.3.1',
-    url = 'http://bitbucket.org/Zopieux/pypeul/',
+    url = 'http://github.com/zopieux/pypeul/',
     license = 'LGPL',
     author = 'mickael9; Zopieux',
     author_email = 'mickael9@gmail.com; zopieux@gmail.com',
